@@ -24,16 +24,30 @@ import {
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Icon } from '@/components/ui/primitives/icon'
+import { authHeaders } from '@/lib/auth-headers'
+import useSWR from 'swr'
 
 export function Sidebar() {
   const { isOpen, setIsOpen, requestExpandLabels } = useSidebar()
   const [expandedMenus, setExpandedMenus] = useState<string[]>([])
-  const { user, logout } = useAuth()
+  const { user, token, logout } = useAuth()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+
+  const fetcher = useMemo(
+    () => (url: string) =>
+      fetch(url, { headers: authHeaders(token) }).then((r) => r.json()),
+    [token],
+  )
+
+  const { data: avatarData } = useSWR(
+    user?.email ? '/api/teacher-avatar' : null,
+    fetcher,
+  )
+  const avatarUrl = avatarData?.data?.avatar_url || null
 
   const closeSidebarOnMobile = useCallback(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
@@ -874,12 +888,22 @@ export function Sidebar() {
                 )}
               >
                 <div className="flex items-center gap-2 mb-1.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#a1001f] text-xs font-bold text-white shadow-md">
-                    {user.displayName
-                      ? user.displayName.charAt(0).toUpperCase()
-                      : user.email
-                        ? user.email.charAt(0).toUpperCase()
-                        : ''}
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#a1001f] text-xs font-bold text-white shadow-md overflow-hidden">
+                    {avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt="Avatar"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span>
+                        {user.displayName
+                          ? user.displayName.charAt(0).toUpperCase()
+                          : user.email
+                            ? user.email.charAt(0).toUpperCase()
+                            : ''}
+                      </span>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold text-gray-900 break-words leading-snug line-clamp-2">
