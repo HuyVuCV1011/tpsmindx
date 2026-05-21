@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     const maxOrderResult = await pool.query(
-      'SELECT COALESCE(MAX(display_order), 0) as max_order FROM chuyen_sau_bode_cauhoi WHERE set_id = $1',
+      'SELECT COALESCE(MAX(thu_tu_hien_thi), 0) as max_order FROM chuyen_sau_bode_cauhoi WHERE id_de = $1',
       [setId]
     );
     let currentOrder = Number(maxOrderResult.rows[0]?.max_order || 0);
@@ -122,17 +122,18 @@ export async function POST(request: NextRequest) {
         currentOrder++;
         const insertQuestion = await pool.query(
           `INSERT INTO chuyen_sau_cauhoi
-          (question_text, question_type, option_a, option_b, option_c, option_d, correct_answer, explanation, points, difficulty, created_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+          (loai_cau_hoi, noi_dung_cau_hoi, lua_chon_a, lua_chon_b, lua_chon_c, lua_chon_d, dap_an_dung, image_url, giai_thich, diem, do_kho, tao_luc)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
           RETURNING id`,
           [
+            row.question_type === 'essay' ? 'tu_luan' : row.question_type,
             normalizedQuestionText,
-            row.question_type === 'essay' ? 'short_answer' : row.question_type,
             optionsArray?.[0] || null,
             optionsArray?.[1] || null,
             optionsArray?.[2] || null,
             optionsArray?.[3] || null,
             row.correct_answer?.trim() || '',
+            row.image_url?.trim() || null,
             row.explanation?.trim() || null,
             points,
             ['easy', 'medium', 'hard'].includes((row.difficulty || '').trim()) ? row.difficulty.trim() : 'medium',
@@ -140,7 +141,7 @@ export async function POST(request: NextRequest) {
         );
 
         await pool.query(
-          `INSERT INTO chuyen_sau_bode_cauhoi (set_id, question_id, display_order, created_at)
+          `INSERT INTO chuyen_sau_bode_cauhoi (id_de, id_cau, thu_tu_hien_thi, tao_luc)
            VALUES ($1, $2, $3, NOW())`,
           [setId, insertQuestion.rows[0].id, currentOrder]
         );

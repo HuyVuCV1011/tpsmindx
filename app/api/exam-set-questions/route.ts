@@ -35,6 +35,76 @@ const stripUnstableImageSources = (value: unknown) => {
   );
 };
 
+const normalizeDbQuestionType = (value: string | null | undefined) => {
+  switch (value) {
+    case 'trac_nghiem':
+      return 'multiple_choice';
+    case 'tu_luan':
+      return 'essay';
+    default:
+      return value || 'multiple_choice';
+  }
+};
+
+const normalizeDbDifficulty = (value: string | null | undefined) => {
+  switch (value) {
+    case 'de':
+      return 'easy';
+    case 'kho':
+      return 'hard';
+    case 'trung_binh':
+      return 'medium';
+    case 'easy':
+    case 'medium':
+    case 'hard':
+      return value;
+    default:
+      return 'medium';
+  }
+};
+
+const normalizeRequestQuestionType = (value: string | null | undefined) => {
+  switch (value) {
+    case 'multiple_choice':
+      return 'trac_nghiem';
+    case 'essay':
+      return 'tu_luan';
+    default:
+      return value || 'trac_nghiem';
+  }
+};
+
+const normalizeRequestDifficulty = (value: string | null | undefined) => {
+  switch (value) {
+    case 'easy':
+      return 'de';
+    case 'hard':
+      return 'kho';
+    case 'medium':
+      return 'trung_binh';
+    default:
+      return value || 'trung_binh';
+  }
+};
+
+// Cache kết quả hasColumn để tránh query information_schema mỗi request
+// (tránh deadlock khi pool.max=1 và client đã được giữ trong transaction)
+const columnCache = new Map<string, boolean>();
+
+async function hasColumn(tableName: string, columnName: string) {
+  const cacheKey = `${tableName}.${columnName}`;
+  if (columnCache.has(cacheKey)) {
+    return columnCache.get(cacheKey)!;
+  }
+  const result = await pool.query(
+    `SELECT 1 FROM information_schema.columns WHERE table_name = $1 AND column_name = $2 LIMIT 1`,
+    [tableName, columnName]
+  );
+  const exists = result.rows.length > 0;
+  columnCache.set(cacheKey, exists);
+  return exists;
+}
+
 // ─── GET: Lấy câu hỏi của một bộ đề theo set_id ──────────────────────────────
 
 export async function GET(request: NextRequest) {
@@ -62,6 +132,7 @@ export async function GET(request: NextRequest) {
          cq.diem                                           AS points,
          bc.thu_tu_hien_thi                                AS order_number,
          COALESCE(cq.do_kho, 'trung_binh')                 AS difficulty,
+         cq.image_url                                      AS image_url,
          bd.ma_de                                          AS set_code,
          bd.ten_de                                         AS set_name,
          mh.ten_mon                                        AS subject_name
@@ -74,7 +145,13 @@ export async function GET(request: NextRequest) {
       [setId]
     );
 
-    return NextResponse.json({ success: true, data: result.rows, count: result.rows.length });
+    const normalizedRows = result.rows.map((row) => ({
+      ...row,
+      question_type: normalizeDbQuestionType(row.question_type),
+      difficulty: normalizeDbDifficulty(row.difficulty),
+    }));
+
+    return NextResponse.json({ success: true, data: normalizedRows, count: normalizedRows.length });
   } catch (error) {
     console.error('Error fetching exam set questions:', error);
     return NextResponse.json({ error: 'Failed to fetch exam set questions' }, { status: 500 });
@@ -97,6 +174,7 @@ export async function POST(request: NextRequest) {
       points = 1,
       order_number,
       difficulty = 'trung_binh',
+      image_url,
     } = body;
 
     if (!set_id) {
@@ -105,34 +183,72 @@ export async function POST(request: NextRequest) {
 
     const sanitizedText = String(stripUnstableImageSources(question_text) || '');
     const normalizedText = sanitizedText.trim() || '[Chưa có nội dung]';
-    const sanitizedCorrectAnswer = correct_answer == null ? null : String(stripUnstableImageSources(correct_answer) || '');
+    const sanitizedCorrectAnswerRaw = correct_answer == null ? null : String(stripUnstableImageSources(correct_answer) || '');
+    const sanitizedCorrectAnswer = sanitizedCorrectAnswerRaw === '' ? null : sanitizedCorrectAnswerRaw;
     const sanitizedExplanation = explanation == null ? null : String(stripUnstableImageSources(explanation) || '');
     const sanitizedOptions = Array.isArray(options)
       ? options.map((item) => String(stripUnstableImageSources(item) || '')).filter(Boolean)
       : [];
 
+    // Normalize question_type và difficulty về giá trị DB
+    const dbQuestionType = normalizeRequestQuestionType(question_type);
+    const dbDifficulty = normalizeRequestDifficulty(difficulty);
+
     await client.query('BEGIN');
 
-    const questionResult = await client.query(
-      `INSERT INTO chuyen_sau_cauhoi (
-         loai_cau_hoi, noi_dung_cau_hoi,
-         lua_chon_a, lua_chon_b, lua_chon_c, lua_chon_d,
-         dap_an_dung, giai_thich, diem, do_kho
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       RETURNING *`,
-      [
-        question_type === 'essay' ? 'tu_luan' : question_type,
-        normalizedText,
-        sanitizedOptions[0] || null,
-        sanitizedOptions[1] || null,
-        sanitizedOptions[2] || null,
-        sanitizedOptions[3] || null,
-        sanitizedCorrectAnswer,
-        sanitizedExplanation,
-        Number(points || 1),
-        ['de', 'trung_binh', 'kho'].includes(difficulty) ? difficulty : 'trung_binh',
-      ]
+    // Dùng client (không dùng pool.query) để tránh deadlock với pool.max=1
+    // Kiểm tra cột image_url tồn tại không — dùng client đang có sẵn
+    const colCheck = await client.query(
+      `SELECT 1 FROM information_schema.columns WHERE table_name = 'chuyen_sau_cauhoi' AND column_name = 'image_url' LIMIT 1`
     );
+    const hasImageUrl = colCheck.rows.length > 0;
+
+    let questionResult;
+    if (hasImageUrl) {
+      questionResult = await client.query(
+        `INSERT INTO chuyen_sau_cauhoi (
+           loai_cau_hoi, noi_dung_cau_hoi,
+           lua_chon_a, lua_chon_b, lua_chon_c, lua_chon_d,
+           dap_an_dung, image_url, giai_thich, diem, do_kho
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         RETURNING *`,
+        [
+          dbQuestionType,
+          normalizedText,
+          sanitizedOptions[0] || null,
+          sanitizedOptions[1] || null,
+          sanitizedOptions[2] || null,
+          sanitizedOptions[3] || null,
+          sanitizedCorrectAnswer,
+          image_url ?? null,
+          sanitizedExplanation,
+          Number(points || 1),
+          dbDifficulty,
+        ]
+      );
+    } else {
+      questionResult = await client.query(
+        `INSERT INTO chuyen_sau_cauhoi (
+           loai_cau_hoi, noi_dung_cau_hoi,
+           lua_chon_a, lua_chon_b, lua_chon_c, lua_chon_d,
+           dap_an_dung, giai_thich, diem, do_kho
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING *`,
+        [
+          dbQuestionType,
+          normalizedText,
+          sanitizedOptions[0] || null,
+          sanitizedOptions[1] || null,
+          sanitizedOptions[2] || null,
+          sanitizedOptions[3] || null,
+          sanitizedCorrectAnswer,
+          sanitizedExplanation,
+          Number(points || 1),
+          dbDifficulty,
+        ]
+      );
+    }
+
     const questionId = questionResult.rows[0].id;
 
     await client.query(
@@ -141,9 +257,8 @@ export async function POST(request: NextRequest) {
       [set_id, questionId, Number(order_number || 1)]
     );
 
-    await client.query('COMMIT');
-
-    const resultRow = await pool.query(
+    // Fetch lại câu hỏi vừa tạo — dùng client đang có sẵn (không dùng pool.query)
+    const resultRow = await client.query(
       `SELECT
          cq.id,
          bc.id_de AS assignment_id,
@@ -165,18 +280,32 @@ export async function POST(request: NextRequest) {
       [questionId]
     );
 
+    await client.query('COMMIT');
+
+    const createdQuestion = resultRow.rows[0]
+      ? {
+          ...resultRow.rows[0],
+          question_type: normalizeDbQuestionType(resultRow.rows[0].question_type),
+          difficulty: normalizeDbDifficulty(resultRow.rows[0].difficulty),
+        }
+      : null;
+
     return NextResponse.json(
-      { success: true, data: resultRow.rows[0], message: 'Exam set question created successfully' },
+      { success: true, data: createdQuestion, message: 'Exam set question created successfully' },
       { status: 201 }
     );
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Error creating exam set question:', error);
-    return NextResponse.json({ error: 'Failed to create exam set question' }, { status: 500 });
+  } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    console.error('[exam-set-questions:POST] Error:', error?.message, error?.code);
+    return NextResponse.json(
+      { error: error?.message || 'Failed to create exam set question' },
+      { status: 500 }
+    );
   } finally {
     client.release();
   }
 }
+
 
 // ─── PUT: Cập nhật câu hỏi ───────────────────────────────────────────────────
 
@@ -190,9 +319,10 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Question id is required' }, { status: 400 });
     }
 
+    const includeImageUrl = await hasColumn('chuyen_sau_cauhoi', 'image_url');
     const allowedFields = [
       'question_text', 'question_type', 'correct_answer',
-      'options', 'explanation', 'points', 'order_number', 'difficulty',
+      'options', ...(includeImageUrl ? ['image_url'] : []), 'explanation', 'points', 'order_number', 'difficulty',
     ];
 
     const questionClauses: string[] = [];
@@ -200,56 +330,70 @@ export async function PUT(request: NextRequest) {
     const mappingClauses: string[] = [];
     const mappingValues: unknown[] = [];
 
-    Object.keys(updates).forEach((key) => {
-      if (!allowedFields.includes(key)) return;
+    for (const key of Object.keys(updates)) {
+      if (!allowedFields.includes(key)) continue;
 
       if (key === 'order_number') {
         mappingClauses.push(`thu_tu_hien_thi = $${mappingValues.length + 1}`);
         mappingValues.push(Number(updates[key] || 1));
-        return;
+        continue;
       }
+
       if (key === 'points') {
         questionClauses.push(`diem = $${questionValues.length + 1}`);
         questionValues.push(Number(updates[key] || 1));
-        return;
+        continue;
       }
+
       if (key === 'options') {
         const sanitized = Array.isArray(updates[key])
           ? updates[key].map((item: unknown) => String(stripUnstableImageSources(item) || '')).filter(Boolean)
           : [];
         const fields = ['lua_chon_a', 'lua_chon_b', 'lua_chon_c', 'lua_chon_d'] as const;
-        fields.forEach((field, idx) => {
+        for (const [idx, field] of fields.entries()) {
           questionClauses.push(`${field} = $${questionValues.length + 1}`);
           questionValues.push(sanitized[idx] || null);
-        });
-        return;
+        }
+        continue;
       }
+
       if (key === 'question_text') {
         questionClauses.push(`noi_dung_cau_hoi = $${questionValues.length + 1}`);
         questionValues.push(stripUnstableImageSources(updates[key]));
-        return;
+        continue;
       }
+
       if (key === 'correct_answer') {
         questionClauses.push(`dap_an_dung = $${questionValues.length + 1}`);
         questionValues.push(stripUnstableImageSources(updates[key]));
-        return;
+        continue;
       }
+
+      if (key === 'image_url') {
+        if (!includeImageUrl) continue;
+        questionClauses.push(`image_url = $${questionValues.length + 1}`);
+        questionValues.push(updates[key] ?? null);
+        continue;
+      }
+
       if (key === 'explanation') {
         questionClauses.push(`giai_thich = $${questionValues.length + 1}`);
         questionValues.push(stripUnstableImageSources(updates[key]));
-        return;
+        continue;
       }
+
       if (key === 'question_type') {
         questionClauses.push(`loai_cau_hoi = $${questionValues.length + 1}`);
-        questionValues.push(updates[key] === 'essay' ? 'tu_luan' : updates[key]);
-        return;
+        questionValues.push(normalizeRequestQuestionType(updates[key] as string));
+        continue;
       }
+
       if (key === 'difficulty') {
         questionClauses.push(`do_kho = $${questionValues.length + 1}`);
-        questionValues.push(updates[key]);
-        return;
+        questionValues.push(normalizeRequestDifficulty(updates[key] as string));
+        continue;
       }
-    });
+    }
 
     if (questionClauses.length === 0 && mappingClauses.length === 0) {
       return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
@@ -265,6 +409,7 @@ export async function PUT(request: NextRequest) {
         questionValues
       );
     }
+
     if (mappingClauses.length > 0) {
       mappingValues.push(id);
       await client.query(
@@ -307,7 +452,7 @@ export async function DELETE(request: NextRequest) {
 
     // Lấy nội dung câu hỏi trước để cleanup ảnh S3
     const existing = await client.query(
-      'SELECT noi_dung_cau_hoi FROM chuyen_sau_cauhoi WHERE id = $1',
+      'SELECT noi_dung_cau_hoi, image_url FROM chuyen_sau_cauhoi WHERE id = $1',
       [id]
     );
 
@@ -334,6 +479,9 @@ export async function DELETE(request: NextRequest) {
     if (existing.rows[0]?.noi_dung_cau_hoi) {
       const urls = extractImageUrls(existing.rows[0].noi_dung_cau_hoi);
       urls.forEach(url => deleteImageSilently(url));
+    }
+    if (existing.rows[0]?.image_url) {
+      deleteImageSilently(existing.rows[0].image_url);
     }
 
     return NextResponse.json({ success: true, message: 'Exam set question deleted successfully' });
