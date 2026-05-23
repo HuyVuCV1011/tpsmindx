@@ -16,14 +16,7 @@ type UploadState = {
 
 type UploadContextType = {
   uploadState: UploadState;
-  startUpload: (file: File, options?: UploadVideoOptions) => Promise<void>;
-};
-
-type UploadVideoOptions = {
-  saveEndpoint?: string;
-  status?: "draft" | "active" | "inactive";
-  successEventName?: string;
-  successMessage?: string;
+  startUpload: (file: File) => Promise<void>;
 };
 
 const UploadContext = createContext<UploadContextType | undefined>(undefined);
@@ -161,10 +154,8 @@ const saveVideoToDB = async (params: {
   chunk_total?: number;
   original_filename?: string;
   original_size_bytes?: number;
-  saveEndpoint?: string;
-  status?: "draft" | "active" | "inactive";
 }) => {
-  const res = await fetchWithRetry(params.saveEndpoint || "/api/training-videos", {
+  const res = await fetchWithRetry("/api/training-videos", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -173,7 +164,7 @@ const saveVideoToDB = async (params: {
       start_date: new Date().toISOString().split("T")[0],
       duration_minutes: Math.ceil((params.duration_seconds || 0) / 60) || 30,
       duration_seconds: params.duration_seconds || 0,
-      status: params.status || "draft",
+      status: "draft",
       video_group_id: params.video_group_id,
       chunk_index: params.chunk_index,
       chunk_total: params.chunk_total,
@@ -198,7 +189,7 @@ export const UploadVideoProvider = ({ children }: { children: React.ReactNode })
     originalFilename: "",
   });
 
-  const startUpload = async (file: File, options: UploadVideoOptions = {}) => {
+  const startUpload = async (file: File) => {
     if (uploadState.isUploading) {
       toast.error("Đang có một tiến trình upload, vui lòng chờ!");
       return;
@@ -257,8 +248,6 @@ export const UploadVideoProvider = ({ children }: { children: React.ReactNode })
           duration_seconds: durationSec,
           original_filename: file.name,
           original_size_bytes: file.size,
-          saveEndpoint: options.saveEndpoint,
-          status: options.status,
         });
 
         if (videoData.success) {
@@ -297,8 +286,6 @@ export const UploadVideoProvider = ({ children }: { children: React.ReactNode })
           duration_seconds: durationSec,
           original_filename: file.name,
           original_size_bytes: file.size,
-          saveEndpoint: options.saveEndpoint,
-          status: options.status,
         });
 
         if (videoData.success) {
@@ -310,8 +297,8 @@ export const UploadVideoProvider = ({ children }: { children: React.ReactNode })
 
       setUploadState((prev) => ({ ...prev, progress: 100, statusText: "Hoàn tất!" }));
       if (isSuccess) {
-        toast.success(options.successMessage || "Tải lên video thành công!");
-        window.dispatchEvent(new Event(options.successEventName || "videoUploaded"));
+        toast.success("Tải lên video thành công!");
+        window.dispatchEvent(new Event("videoUploaded"));
       }
     } catch (err: any) {
       console.error("Upload error:", err);

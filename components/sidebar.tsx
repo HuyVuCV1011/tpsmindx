@@ -141,10 +141,6 @@ export function Sidebar() {
           href: '/admin/hr-candidates/gen-planner?region=north',
           label: 'Miền Bắc (HN + Tỉnh Bắc + Tỉnh Trung)',
         },
-        {
-          href: '/admin/hr-onboarding/videos',
-          label: 'Video đào tạo đầu vào',
-        },
       ],
     },
     {

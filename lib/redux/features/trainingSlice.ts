@@ -23,7 +23,7 @@ export const trainingSlice = createSlice({
   name: 'training',
   initialState,
   reducers: {
-    setVideo: (state, action: PayloadAction<{ id: number; link: string; fallbackLink?: string | null; duration: number; title: string, segments?: Array<{ id: number; url: string; duration_minutes: number; duration_seconds?: number | null }> }>) => {
+    setVideo: (state, action: PayloadAction<{ id: number; link: string; fallbackLink?: string | null; duration: number; title: string, segments?: Array<{ id: number; url: string; duration_minutes: number }> }>) => {
       state.currentVideoId = action.payload.id;
       // If we want to hide the full link or manipulate it before storing
       state.videoLink = action.payload.link; 

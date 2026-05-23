@@ -59,7 +59,6 @@ const nextConfig: NextConfig = {
     webpackBuildWorker: false,
     serverSourceMaps: false,
     proxyClientMaxBodySize: "512mb",
-    turbopackUseSystemTlsCerts: true,
   },
   serverExternalPackages: ['ffprobe-static'],
 
