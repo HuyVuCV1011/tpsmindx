@@ -2002,7 +2002,6 @@ const migrations: Migration[] = [
     `,
   },
   {
-<<<<<<< HEAD
     name: 'V79_hr_onboarding_foundation',
     version: 79,
     sql: `
@@ -2218,13 +2217,6 @@ const migrations: Migration[] = [
 
       CREATE INDEX IF NOT EXISTS idx_teaching_documents_course_name
         ON teaching_documents(course_name);
-=======
-    name: 'V79_chuyen_sau_cauhoi_image_url',
-    version: 79,
-    sql: `
-      ALTER TABLE chuyen_sau_cauhoi
-        ADD COLUMN IF NOT EXISTS image_url VARCHAR(1000);
->>>>>>> 72f9f134361d63004994bd4681207f61c474b508
     `,
   },
 ]
