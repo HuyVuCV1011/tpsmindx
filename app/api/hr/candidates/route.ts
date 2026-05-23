@@ -1,5 +1,6 @@
 import { requireBearerSession } from '@/lib/datasource-api-auth';
 import { withApiProtection } from '@/lib/api-protection';
+import { createCandidateUser, generateCandidateCode } from '@/lib/candidate-code';
 import pool from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -285,7 +286,6 @@ const handlePost = async (request: NextRequest) => {
     // 3. Nếu chưa có candidate_code, tự động tạo mã và tạo tài khoản
     let updatedCode = candidate.candidate_code;
     if (!updatedCode) {
-      const { generateCandidateCode } = require('../../../../lib/candidate-code');
       const genNumberMatch = genName.match(/\d+/);
       const genNumber = genNumberMatch ? parseInt(genNumberMatch[0]) : 0;
       
@@ -312,7 +312,6 @@ const handlePost = async (request: NextRequest) => {
 
     // 5. Nếu lúc đầu chưa có candidate_code, tạo tài khoản người dùng tương ứng
     if (!candidate.candidate_code && updatedCode) {
-      const { createCandidateUser } = require('../../../../lib/candidate-code');
       try {
         await createCandidateUser(candidateId, updatedCode);
       } catch (userErr: any) {

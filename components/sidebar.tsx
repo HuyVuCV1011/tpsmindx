@@ -296,6 +296,7 @@ export function Sidebar() {
       icon: BookOpen,
       submenu: [
         { href: '/user/quy-trinh-quy-dinh', label: 'Quy trình & Quy định' },
+        { href: '/user/giao-trinh-chuyen-mon', label: 'Giáo trình chuyên môn' },
       ],
     },
     {
