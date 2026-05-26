@@ -390,6 +390,69 @@
     animation: pulse-glow 2s ease-in-out infinite;
   }
 
+  @keyframes cta-glow-pulse {
+    0%,
+    100% {
+      box-shadow:
+        0 0 0 0 rgba(161, 0, 31, 0.35),
+        0 8px 18px rgba(161, 0, 31, 0.18);
+      filter: brightness(1);
+    }
+    50% {
+      box-shadow:
+        0 0 0 5px rgba(161, 0, 31, 0),
+        0 10px 26px rgba(161, 0, 31, 0.45);
+      filter: brightness(1.1);
+    }
+  }
+
+  @keyframes cta-shine-sweep {
+    0%,
+    35% {
+      transform: translateX(-140%) skewX(-18deg);
+      opacity: 0;
+    }
+    50% {
+      opacity: 0.75;
+    }
+    75%,
+    100% {
+      transform: translateX(140%) skewX(-18deg);
+      opacity: 0;
+    }
+  }
+
+  .animate-cta-glow {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    animation: cta-glow-pulse 1.7s ease-in-out infinite;
+  }
+
+  .animate-cta-glow::after {
+    content: "";
+    position: absolute;
+    inset: -20% -45%;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.18) 42%,
+      rgba(255, 255, 255, 0.7) 50%,
+      rgba(255, 255, 255, 0.18) 58%,
+      transparent 100%
+    );
+    animation: cta-shine-sweep 2.2s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-cta-glow,
+    .animate-cta-glow::after {
+      animation: none;
+    }
+  }
+
   /* Smooth transitions for all interactive elements */
   button,
   a,
@@ -2229,5 +2292,52 @@ input[type='reset'] {
 
   .bao-tri-eyebrow-glow::after {
     display: none;
+  }
+}
+
+/* Secure DOCX viewer */
+.secure-docx-frame {
+  color: #111827;
+}
+
+.secure-docx-frame .docx-wrapper {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.secure-docx-frame .docx {
+  margin: 0 auto 18px !important;
+  box-shadow:
+    0 18px 45px rgba(15, 23, 42, 0.16),
+    0 0 0 1px rgba(15, 23, 42, 0.08) !important;
+}
+
+.secure-docx-frame .docx:last-child {
+  margin-bottom: 0 !important;
+}
+
+.secure-docx-frame table {
+  border-collapse: collapse;
+  max-width: 100%;
+}
+
+.secure-docx-frame td,
+.secure-docx-frame th {
+  vertical-align: top;
+}
+
+.secure-docx-frame img {
+  max-width: 100%;
+}
+
+.secure-docx-frame a {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .secure-docx-frame .docx-wrapper {
+    overflow-x: auto;
   }
 }

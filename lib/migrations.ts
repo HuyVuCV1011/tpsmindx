@@ -354,12 +354,15 @@ const migrations: Migration[] = [
         lua_chon_c TEXT,
         lua_chon_d TEXT,
         dap_an_dung TEXT,
+        image_url TEXT,
         giai_thich TEXT,
         diem DECIMAL(5,2) DEFAULT 1.0,
         do_kho VARCHAR(20),
         tao_luc TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      ALTER TABLE chuyen_sau_cauhoi ADD COLUMN IF NOT EXISTS image_url TEXT;
 
       CREATE TABLE IF NOT EXISTS chuyen_sau_bode_cauhoi (
         id SERIAL PRIMARY KEY,
@@ -1996,6 +1999,14 @@ const migrations: Migration[] = [
         BEFORE UPDATE ON teacher_avatars
         FOR EACH ROW
         EXECUTE FUNCTION update_updated_at_column();
+    `,
+  },
+  {
+    name: 'V79_chuyen_sau_cauhoi_image_url',
+    version: 79,
+    sql: `
+      ALTER TABLE chuyen_sau_cauhoi
+        ADD COLUMN IF NOT EXISTS image_url VARCHAR(1000);
     `,
   },
 ]
