@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
  *  - Returns minimal error information to the client.
  */
 
-const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID!;
+const SPREADSHEET_ID = '1pOfZp4w__q-KBEE-wrwGjjq_J3KSjAYfpHCJxL-LsGs';
 const SHEET_GID = '1375184237'; // Specific GID for the "Dashboard" tab
 
 // Mapping from CSV column index (0‑based) to video_id – identical to import_advanced_scores.js
