@@ -2557,23 +2557,6 @@ export default function MonthlyActivitiesPage() {
                           event.eventType,
                         )
 
-                        if (event.eventType === 'registration') {
-                          return (
-                            <button
-                              type="button"
-                              key={event.id}
-                              className={`rounded-sm px-1 py-1 text-center text-[11px] leading-4 font-bold whitespace-pre-line ${calendarEventStyle.titleClassName}`}
-                              title={event.title.replace(/\n/g, ' ')}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleDayEventClick(date, event)
-                              }}
-                            >
-                              {event.title}
-                            </button>
-                          )
-                        }
-
                         return (
                           <button
                             type="button"
@@ -2872,7 +2855,7 @@ export default function MonthlyActivitiesPage() {
                             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                           >
                             {event.registrationTemplate === 'supplement'
-                              ? 'Đăng ký kiểm tra chuyên sâu bổ sung'
+                              ? 'Kiểm tra chuyên sâu bổ sung'
                               : 'Đăng ký kiểm tra chuyên sâu chính thức'}
                           </button>
                         </div>
