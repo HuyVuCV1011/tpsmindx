@@ -1,5 +1,6 @@
 import { requireBearerSession } from '@/lib/datasource-api-auth';
 import { withApiProtection } from '@/lib/api-protection';
+import { createCandidateUser, generateCandidateCode } from '@/lib/candidate-code';
 import pool from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -229,7 +230,16 @@ const handlePost = async (request: NextRequest) => {
       return NextResponse.json({ error: 'candidateId và assignedGen là bắt buộc.' }, { status: 400 });
     }
 
-    // Lookup gen_id từ catalog
+    // Load the current candidate so a first GEN assignment can create code/account.
+    const candResult = await pool.query(
+      `SELECT candidate_code, region_code, work_block, gen_id FROM hr_candidates WHERE id = $1`,
+      [candidateId]
+    );
+    if (candResult.rowCount === 0) {
+      return NextResponse.json({ error: 'Candidate not found.' }, { status: 404 });
+    }
+    const candidate = candResult.rows[0];
+
     const genResult = await pool.query(
       `INSERT INTO hr_gen_catalog (gen_name, source, created_by_email, is_active)
        VALUES ($1, 'manual', $2, true)
@@ -239,14 +249,35 @@ const handlePost = async (request: NextRequest) => {
     );
     const genId = genResult.rows[0].id;
 
+    let updatedCode = candidate.candidate_code;
+    if (!updatedCode) {
+      const genNumberMatch = genName.match(/\d+/);
+      const genNumber = genNumberMatch ? parseInt(genNumberMatch[0]) : 0;
+      updatedCode = await generateCandidateCode(
+        candidate.region_code || '2',
+        genNumber,
+        candidate.work_block || 'Tech'
+      );
+    }
+
     const result = await pool.query(
-      `UPDATE hr_candidates SET gen_id = $1, updated_by_email = $2, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3 RETURNING *`,
-      [genId, auth.sessionEmail, candidateId]
+      `UPDATE hr_candidates
+       SET gen_id = $1,
+           initial_gen_id = COALESCE(initial_gen_id, $1),
+           current_gen_id = COALESCE(current_gen_id, $1),
+           candidate_code = $2,
+           updated_by_email = $3,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4 RETURNING *`,
+      [genId, updatedCode, auth.sessionEmail, candidateId]
     );
 
-    if (result.rowCount === 0) {
-      return NextResponse.json({ error: 'Không tìm thấy ứng viên.' }, { status: 404 });
+    if (!candidate.candidate_code && updatedCode) {
+      try {
+        await createCandidateUser(candidateId, updatedCode);
+      } catch (userErr: any) {
+        console.warn('User account creation skipped or warning:', userErr.message);
+      }
     }
 
     return NextResponse.json({ success: true, candidate: result.rows[0] });

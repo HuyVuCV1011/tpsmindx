@@ -1,13 +1,13 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  LayoutGrid, 
-  Calendar as CalendarIcon, 
-  MapPin, 
-  Clock, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
+  Calendar as CalendarIcon,
+  MapPin,
+  Clock,
   Search,
   Filter,
   Info
@@ -152,19 +152,19 @@ export default function GenOverviewTab({
             </div>
 
             <div className="flex items-center gap-2">
-              <button 
+              <button
                 onClick={() => moveMonth(-1)}
                 className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
-              <button 
+              <button
                 onClick={() => setFocusDate(new Date())}
                 className="px-4 h-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm hidden sm:flex"
               >
                 Hôm nay
               </button>
-              <button 
+              <button
                 onClick={() => moveMonth(1)}
                 className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
               >
