@@ -4,6 +4,7 @@ import { getJwtSecret } from '@/lib/jwt-secret';
 import { clientIpFromRequest, rateLimitOr429 } from '@/lib/rate-limit-memory';
 import { setSessionCookieOnResponse } from '@/lib/session-cookie';
 import { logLoginFailed, logLoginSuccess } from '@/lib/audit-logger';
+import { filterManagementPermissions } from '@/lib/admin-permission-routes';
 import { checkAndRecordThreat, isIpBlocked } from '@/lib/brute-force-guard';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -75,21 +76,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (userResult.rows.length === 0) {
-      // Ghi log thất bại + kiểm tra brute force
-      logLoginFailed({ email: normalizedInput, ip, userAgent, reason: 'user_not_found' });
-      await checkAndRecordThreat(ip, 'LOGIN_FAIL');
+      // Not a final failed login yet: the UI can still fall back to Firebase auth.
       return NextResponse.json({ appUser: false });
     }
 
     const user = userResult.rows[0];
 
-    if (user.auth_type === 'firebase') {
+    const authType = String(user.auth_type ?? '').trim().toLowerCase();
+    if (authType === 'firebase' || !user.password_hash) {
       return NextResponse.json({ appUser: false });
-    }
-
-    if (!user.password_hash) {
-      logLoginFailed({ email: normalizedInput, ip, userAgent, reason: 'no_password_hash' });
-      return NextResponse.json({ error: 'Tài khoản không có mật khẩu hợp lệ.' }, { status: 401 });
     }
 
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
@@ -117,7 +112,9 @@ export async function POST(request: NextRequest) {
          ) permissions`,
         [user.id]
       );
-      permissions = permissionsResult.rows.map((row: { route_path: string }) => row.route_path);
+      permissions = filterManagementPermissions(
+        permissionsResult.rows.map((row: { route_path: string }) => row.route_path),
+      );
     } catch (permErr) {
       console.error('App auth: permissions query failed', permErr);
     }

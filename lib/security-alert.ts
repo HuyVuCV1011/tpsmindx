@@ -18,7 +18,7 @@ import type { AuditEvent } from '@/lib/audit-logger';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID   = process.env.TELEGRAM_CHAT_ID;
-const APP_NAME           = process.env.NEXT_PUBLIC_APP_URL ?? 'TMS MindX';
+const APP_NAME           = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.tpsmindx.com/';
 
 // Chỉ gửi alert cho các severity này
 const ALERT_SEVERITIES = new Set(['CRITICAL', 'HIGH']);
@@ -47,6 +47,11 @@ const EVENT_ICON: Record<string, string> = {
   GENERAL:              'ℹ️',
 };
 
+function eventActorLabel(event: AuditEvent): string {
+  if (event.user_email) return event.user_email;
+  return event.event_type === 'SYSTEM' ? 'system-event' : 'invalid-session-email';
+}
+
 // ─── Core alert function ──────────────────────────────────────
 
 /**
@@ -61,8 +66,10 @@ export function sendSecurityAlert(event: AuditEvent & { id?: number }): void {
   const isPrivEsc    = event.event_type === 'PRIVILEGE_ESCALATION';
   const isBruteForce = event.action?.includes('BRUTE_FORCE');
   const isCritical   = event.severity === 'CRITICAL';
+  const isMissingActor = event.threat_flags?.includes('MISSING_ACTOR_EMAIL') === true;
+  const actorLabel = eventActorLabel(event);
 
-  if (!isPrivEsc && !isBruteForce && !isCritical) return;
+  if (!isPrivEsc && !isBruteForce && !isCritical && !isMissingActor) return;
 
   // Gửi qua Telegram nếu đã cấu hình
   if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
@@ -76,7 +83,7 @@ export function sendSecurityAlert(event: AuditEvent & { id?: number }): void {
     console.warn(
       `\n${icon} SECURITY ALERT [${sev}]\n` +
       `  Action:  ${event.action}\n` +
-      `  User:    ${event.user_email ?? 'anonymous'} (${event.user_role ?? 'no role'})\n` +
+      `  User:    ${actorLabel} (${event.user_role ?? 'no role'})\n` +
       `  IP:      ${event.ip_address ?? 'unknown'}\n` +
       `  Flags:   ${event.threat_flags?.join(', ') ?? 'none'}\n` +
       `  Risk:    ${event.risk_score}/100\n` +
@@ -111,7 +118,7 @@ async function sendTelegramAlert(event: AuditEvent & { id?: number }): Promise<v
     `🏢 *App:* ${APP_NAME}`,
     '',
     `${eventIcon} *Event:* \`${event.action}\``,
-    `👤 *User:* ${event.user_email ? `\`${event.user_email}\`` : '_anonymous_'}`,
+    `👤 *User:* \`${eventActorLabel(event)}\``,
     `🎭 *Role:* ${event.user_role ?? 'N/A'}`,
     `🌐 *IP:* \`${event.ip_address ?? 'unknown'}\``,
     `🔗 *Endpoint:* \`${event.endpoint ?? 'N/A'}\``,
@@ -193,7 +200,7 @@ export async function sendEmailAlert(event: AuditEvent & { id?: number }): Promi
         <h2>${icon} Security Alert — ${event.severity}</h2>
         <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;font-family:monospace">
           <tr><td><b>Action</b></td><td>${event.action}</td></tr>
-          <tr><td><b>User</b></td><td>${event.user_email ?? 'anonymous'}</td></tr>
+          <tr><td><b>User</b></td><td>${eventActorLabel(event)}</td></tr>
           <tr><td><b>Role</b></td><td>${event.user_role ?? 'N/A'}</td></tr>
           <tr><td><b>IP</b></td><td>${event.ip_address ?? 'unknown'}</td></tr>
           <tr><td><b>Endpoint</b></td><td>${event.endpoint ?? 'N/A'}</td></tr>

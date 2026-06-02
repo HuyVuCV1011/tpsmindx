@@ -8,12 +8,28 @@ export interface TrafficStatus {
   level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 }
 
+// Throttle: chỉ check mỗi 5 phút/instance để tránh tốn DB queries
+// (Vercel serverless: mỗi instance có lastCheckTime riêng)
+let lastCheckTime = 0;
+const CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 phút
+
+// Cache kết quả check trước để trả về ngay nếu chưa đến lượt check mới
+let lastResult: TrafficStatus = { activeUsers: 0, totalMentors: 0, ratio: 0, level: 'LOW' };
+
 /**
  * Kiểm tra lưu lượng phiên đăng nhập đồng thời và đối chiếu với số lượng Mentor (Teachers).
  * Nếu vượt ngưỡng an toàn (90% hoặc 100% số Mentor) sẽ tự động kích hoạt ghi log CRITICAL/HIGH
  * để đẩy cảnh báo khẩn cấp về Telegram Group.
+ * 
+ * Throttled: chỉ thực sự query DB mỗi 5 phút. Các lần gọi giữa 2 kỳ check sẽ return cached result.
  */
 export async function checkSessionTraffic(): Promise<TrafficStatus> {
+  const now = Date.now();
+  if (now - lastCheckTime < CHECK_INTERVAL_MS) {
+    // Trả về kết quả cache, không tốn DB query
+    return lastResult;
+  }
+  lastCheckTime = now;
   try {
     // 1. Lấy số lượng tài khoản hoạt động đồng thời (15 phút qua)
     const activeRes = await pool.query(
@@ -75,7 +91,8 @@ export async function checkSessionTraffic(): Promise<TrafficStatus> {
       }
     }
 
-    return { activeUsers, totalMentors, ratio, level };
+    lastResult = { activeUsers, totalMentors, ratio, level };
+    return lastResult;
   } catch (err) {
     console.error('[SessionMonitor] Error checking session traffic:', (err as Error).message);
     return { activeUsers: 0, totalMentors: 0, ratio: 0, level: 'LOW' };

@@ -2,6 +2,10 @@ import {
   requireBearerDbRoles,
   requireBearerSuperAdmin,
 } from '@/lib/auth-server';
+import {
+  filterManagementPermissions,
+  isManagementPermissionRoute,
+} from '@/lib/admin-permission-routes';
 import pool from '@/lib/db';
 import { logCreate, logDelete, logRoleChange, logUpdate, getRequestMeta } from '@/lib/audit-logger';
 import bcrypt from 'bcryptjs';
@@ -38,7 +42,16 @@ export async function GET(request: NextRequest) {
       ORDER BY u.created_at DESC
     `);
 
-    return NextResponse.json({ users: result.rows });
+    return NextResponse.json({
+      users: result.rows.map((row) => ({
+        ...row,
+        permissions: Array.isArray(row.permissions)
+          ? row.permissions.filter((permission: { route_path: string }) =>
+              isManagementPermissionRoute(permission.route_path),
+            )
+          : [],
+      })),
+    });
   } catch (error: unknown) {
     console.error('Error listing users:', error);
     return NextResponse.json({ error: 'Lỗi server' }, { status: 500 });
@@ -96,11 +109,15 @@ export async function POST(request: NextRequest) {
 
     const newUser = userResult.rows[0];
 
-    if (permissions && Array.isArray(permissions) && permissions.length > 0) {
-      const permValues = permissions
+    const safePermissions = Array.isArray(permissions)
+      ? filterManagementPermissions(permissions)
+      : [];
+
+    if (safePermissions.length > 0) {
+      const permValues = safePermissions
         .map((_: string, i: number) => `($1, $${i + 2}, true)`)
         .join(', ');
-      const permParams = [newUser.id, ...permissions];
+      const permParams = [newUser.id, ...safePermissions];
       await pool.query(
         `INSERT INTO app_permissions (user_id, route_path, can_access) VALUES ${permValues}
          ON CONFLICT (user_id, route_path) DO UPDATE SET can_access = true`,
