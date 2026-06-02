@@ -115,3 +115,18 @@ export async function unblockIp(ip: string): Promise<void> {
     [ip]
   );
 }
+
+/**
+ * Khóa một IP thủ công (admin action).
+ */
+export async function blockIp(ip: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO public.security_threat_tracking (ip_address, threat_type, attempt_count, is_blocked, blocked_until, notes)
+     VALUES ($1, 'MANUAL_BLOCK', 1, true, NOW() + INTERVAL '24 hours', 'Blocked manually by admin via Telegram bot')
+     ON CONFLICT (ip_address, threat_type) DO UPDATE
+     SET is_blocked = true, 
+         blocked_until = NOW() + INTERVAL '24 hours', 
+         attempt_count = security_threat_tracking.attempt_count + 1`,
+    [ip]
+  );
+}

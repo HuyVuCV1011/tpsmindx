@@ -128,14 +128,28 @@ async function sendTelegramAlert(event: AuditEvent & { id?: number }): Promise<v
 
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
 
+  const bodyPayload: Record<string, unknown> = {
+    chat_id:    TELEGRAM_CHAT_ID,
+    text:       message,
+    parse_mode: 'Markdown',
+  };
+
+  // Đính kèm các nút tương tác thông minh (Inline Keyboard Buttons) nếu có IP nguồn
+  if (event.ip_address && event.ip_address !== 'unknown') {
+    bodyPayload.reply_markup = {
+      inline_keyboard: [
+        [
+          { text: '🛡️ Khóa IP (24h)', callback_data: `tgblock:${event.ip_address}` },
+          { text: '🔓 Mở khóa IP', callback_data: `tgunblock:${event.ip_address}` }
+        ]
+      ]
+    };
+  }
+
   const response = await fetch(url, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({
-      chat_id:    TELEGRAM_CHAT_ID,
-      text:       message,
-      parse_mode: 'Markdown',
-    }),
+    body:    JSON.stringify(bodyPayload),
   });
 
   if (!response.ok) {
