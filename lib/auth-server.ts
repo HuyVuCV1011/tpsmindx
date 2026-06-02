@@ -34,20 +34,49 @@ export async function getDbRoleForEmail(
   }
 }
 
+/** Trích xuất IP từ request headers */
+function extractIp(request: NextRequest): string {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    request.headers.get('x-real-ip') ??
+    'unknown'
+  );
+}
+
 /** Bearer hợp lệ + role DB thuộc tập cho phép (không tin role trong JWT). */
 export async function requireBearerDbRoles(
   request: NextRequest,
   allowedRoles: string[],
 ): Promise<DbRoleResult> {
   const auth = await requireBearerSession(request);
+
   if (!auth.ok) {
+    // ── Log: bearer không hợp lệ / chưa đăng nhập ──
+    const { logUnauthorizedAccess } = await import('@/lib/audit-logger');
+    logUnauthorizedAccess({
+      email:        null,
+      role:         null,
+      ip:           extractIp(request),
+      userAgent:    request.headers.get('user-agent') ?? '',
+      endpoint:     `${request.method} ${request.nextUrl.pathname}`,
+      requiredRole: allowedRoles.join('|'),
+    });
     return { ok: false, response: auth.response };
   }
-  const role = await getDbRoleForEmail(
-    auth.sessionEmail,
-    auth.resolvedAccess,
-  );
+
+  const role = await getDbRoleForEmail(auth.sessionEmail, auth.resolvedAccess);
+
   if (!role || !allowedRoles.includes(role)) {
+    // ── Log: đã đăng nhập nhưng không đủ quyền (privilege escalation attempt) ──
+    const { logUnauthorizedAccess } = await import('@/lib/audit-logger');
+    logUnauthorizedAccess({
+      email:        auth.sessionEmail,
+      role:         role ?? 'unknown',
+      ip:           extractIp(request),
+      userAgent:    request.headers.get('user-agent') ?? '',
+      endpoint:     `${request.method} ${request.nextUrl.pathname}`,
+      requiredRole: allowedRoles.join('|'),
+    });
     return {
       ok: false,
       response: NextResponse.json(
@@ -56,6 +85,7 @@ export async function requireBearerDbRoles(
       ),
     };
   }
+
   return { ok: true, sessionEmail: auth.sessionEmail, role };
 }
 
