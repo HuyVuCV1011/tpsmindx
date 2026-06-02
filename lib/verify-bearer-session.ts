@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken'
 import pool from '@/lib/db'
 import { getJwtSecret } from '@/lib/jwt-secret'
+import { normalizeAuthenticatedEmail } from '@/lib/security-identity'
 
 export type VerifiedSession = {
   email: string
@@ -22,9 +23,10 @@ export async function verifyBearerGetSession(
       email?: string
       role?: string
     }
-    if (decoded.email && typeof decoded.email === 'string') {
+    const email = normalizeAuthenticatedEmail(decoded.email)
+    if (email) {
       return {
-        email: decoded.email.trim().toLowerCase(),
+        email,
         role: decoded.role,
       }
     }
@@ -45,8 +47,7 @@ async function verifyFirebaseIdTokenEmail(
     const res = await fetch(url, { cache: 'no-store' })
     if (!res.ok) return null
     const data = (await res.json()) as Record<string, unknown>
-    const email = typeof data.email === 'string' ? data.email.trim().toLowerCase() : ''
-    return email || null
+    return normalizeAuthenticatedEmail(data.email)
   } catch {
     return null
   }

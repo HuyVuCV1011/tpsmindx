@@ -9,6 +9,7 @@
 
 import pool from '@/lib/db';
 import { NextRequest } from 'next/server';
+import { normalizeAuthenticatedEmail } from '@/lib/security-identity';
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -40,6 +41,19 @@ export interface AuditEvent {
   session_id?:   string | null;
 }
 
+function isBlank(value: unknown): boolean {
+  return normalizeAuthenticatedEmail(value) === null;
+}
+
+function requiresAuthenticatedActor(event: AuditEvent): boolean {
+  return (
+    event.event_type === 'DATA_MUTATION' ||
+    event.action === 'CREATE' ||
+    event.action === 'UPDATE' ||
+    event.action === 'DELETE'
+  );
+}
+
 // ─── Core write function ──────────────────────────────────────
 
 /**
@@ -47,6 +61,51 @@ export interface AuditEvent {
  * Fire-and-forget: lỗi chỉ được console.error, không throw.
  */
 export function writeAuditLog(event: AuditEvent): void {
+  const missingActor = requiresAuthenticatedActor(event) && isBlank(event.user_email);
+  const eventToWrite: AuditEvent = missingActor
+    ? {
+        event_type: 'SYSTEM',
+        action: 'AUDIT_MISSING_ACTOR',
+        severity: 'CRITICAL',
+        user_email: 'audit-system@tps.internal',
+        user_role: 'system',
+        resource_type: 'security_audit_logs',
+        resource_id: `${event.resource_type}:${event.resource_id ?? 'unknown'}`,
+        new_data: {
+          rejected_action: event.action,
+          rejected_event_type: event.event_type,
+          rejected_resource_type: event.resource_type,
+          rejected_resource_id: event.resource_id ?? null,
+          original_old_data: event.old_data ?? null,
+          original_new_data: event.new_data ?? null,
+          original_endpoint: event.endpoint ?? null,
+          original_ip_address: event.ip_address ?? null,
+          original_user_agent: event.user_agent ?? null,
+        },
+        endpoint: event.endpoint,
+        ip_address: event.ip_address,
+        user_agent: event.user_agent,
+        risk_score: 100,
+        threat_flags: Array.from(new Set([...(event.threat_flags ?? []), 'MISSING_ACTOR_EMAIL'])),
+        session_id: event.session_id,
+      }
+    : {
+        ...event,
+        user_email: event.user_email?.trim() || null,
+        risk_score: event.risk_score ?? 0,
+        threat_flags: event.threat_flags ?? [],
+      };
+
+  if (missingActor) {
+    console.error('[AuditLog] Mutation event rejected because actor email is missing', {
+      action: event.action,
+      resource_type: event.resource_type,
+      resource_id: event.resource_id,
+      endpoint: event.endpoint,
+      ip_address: event.ip_address,
+    });
+  }
+
   const {
     event_type, action, severity,
     user_email, user_role,
@@ -56,7 +115,7 @@ export function writeAuditLog(event: AuditEvent): void {
     risk_score = 0,
     threat_flags = [],
     session_id,
-  } = event;
+  } = eventToWrite;
 
   pool.query(
     `INSERT INTO public.security_audit_logs (
@@ -89,7 +148,7 @@ export function writeAuditLog(event: AuditEvent): void {
     // ── Auto-alert cho HIGH/CRITICAL events ──
     if (severity === 'CRITICAL' || severity === 'HIGH') {
       import('@/lib/security-alert').then(({ sendSecurityAlert }) => {
-        sendSecurityAlert(event);
+        sendSecurityAlert(eventToWrite);
       }).catch(() => {/* non-blocking */});
     }
   }).catch((err: Error) => {

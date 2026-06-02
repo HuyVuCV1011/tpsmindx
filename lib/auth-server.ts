@@ -4,6 +4,7 @@ import {
 } from '@/lib/app-user-access';
 import { requireBearerSession } from '@/lib/datasource-api-auth';
 import pool from '@/lib/db';
+import { normalizeAuthenticatedEmail } from '@/lib/security-identity';
 import { NextRequest, NextResponse } from 'next/server';
 
 export type DbRoleResult =
@@ -64,13 +65,33 @@ export async function requireBearerDbRoles(
     return { ok: false, response: auth.response };
   }
 
-  const role = await getDbRoleForEmail(auth.sessionEmail, auth.resolvedAccess);
+  const sessionEmail = normalizeAuthenticatedEmail(auth.sessionEmail);
+  if (!sessionEmail) {
+    const { logUnauthorizedAccess } = await import('@/lib/audit-logger');
+    logUnauthorizedAccess({
+      email:        null,
+      role:         null,
+      ip:           extractIp(request),
+      userAgent:    request.headers.get('user-agent') ?? '',
+      endpoint:     `${request.method} ${request.nextUrl.pathname}`,
+      requiredRole: allowedRoles.join('|'),
+    });
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { success: false, error: 'Phiên đăng nhập không có email xác thực hợp lệ' },
+        { status: 401 },
+      ),
+    };
+  }
+
+  const role = await getDbRoleForEmail(sessionEmail, auth.resolvedAccess);
 
   if (!role || !allowedRoles.includes(role)) {
     // ── Log: đã đăng nhập nhưng không đủ quyền (privilege escalation attempt) ──
     const { logUnauthorizedAccess } = await import('@/lib/audit-logger');
     logUnauthorizedAccess({
-      email:        auth.sessionEmail,
+      email:        sessionEmail,
       role:         role ?? 'unknown',
       ip:           extractIp(request),
       userAgent:    request.headers.get('user-agent') ?? '',
@@ -86,7 +107,7 @@ export async function requireBearerDbRoles(
     };
   }
 
-  return { ok: true, sessionEmail: auth.sessionEmail, role };
+  return { ok: true, sessionEmail, role };
 }
 
 export async function requireBearerSuperAdmin(

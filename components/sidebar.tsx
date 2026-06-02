@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/lib/auth-context'
+import { filterManagementPermissions } from '@/lib/admin-permission-routes'
 import { useSidebar } from '@/lib/sidebar-context'
 import { isTempHiddenUserRoute } from '@/lib/temp-hidden-user-routes'
 import { cn } from '@/lib/utils'
@@ -361,7 +362,7 @@ export function Sidebar() {
 
     // manager và admin luôn có quyền truy cập deal-luong
     const DEAL_LUONG_ROUTES = ['/admin/deal-luong', '/admin/tao-deal-luong']
-    const basePermissions = user.permissions || []
+    const basePermissions = filterManagementPermissions(user.permissions || [])
     const permissions = ['manager', 'admin'].includes(normalizedRole)
       ? Array.from(new Set([...basePermissions, ...DEAL_LUONG_ROUTES]))
       : basePermissions

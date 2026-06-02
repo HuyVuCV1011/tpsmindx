@@ -252,7 +252,7 @@ export async function POST(request: NextRequest) {
         const now = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
         const reply = [
           '📊 *TRẠNG THÁI HỆ THỐNG BẢO MẬT*',
-          '🏢 *App:* TMS MindX (https://tmsmindx.vercel.app)',
+          '🏢 *App:* https://www.tpsmindx.com/',
           '',
           '🛡️ *Thông số giám sát:*',
           `- Số bảng chưa bật RLS: \`${disabledRlsCount}\` ${disabledRlsCount === '0' ? '✅' : '⚠️'}`,
@@ -381,10 +381,13 @@ export async function POST(request: NextRequest) {
           action: string;
           user_email: string | null;
           ip_address: string | null;
+          endpoint: string | null;
+          resource_type: string | null;
+          resource_id: string | null;
           created_at: string;
           severity: string;
         }>(
-          `SELECT event_type, action, user_email, ip_address, created_at, severity
+          `SELECT event_type, action, user_email, ip_address, endpoint, resource_type, resource_id, created_at, severity
            FROM public.security_audit_logs
            WHERE created_at > NOW() - INTERVAL '24 hours'
            ORDER BY created_at DESC
@@ -394,22 +397,32 @@ export async function POST(request: NextRequest) {
         const detailsLines = detailsRes.rows.map((row, idx) => {
           const time = new Date(row.created_at).toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' });
           const icon = typesMap[row.event_type]?.split(' ')[0] ?? 'ℹ️';
-          const userStr = row.user_email ? `\`${row.user_email}\`` : '_anonymous_';
+          const missingActorLog = !row.user_email && row.event_type === 'DATA_MUTATION';
+          const userStr = row.user_email
+            ? `\`${row.user_email}\``
+            : missingActorLog
+              ? '`audit-system@tps.internal`'
+              : row.event_type === 'SYSTEM'
+                ? '_system-event_'
+                : '_invalid-session-email_';
           const ipStr = row.ip_address && row.ip_address !== 'unknown' ? ` (IP: \`${row.ip_address}\`)` : '';
-          const actionStr = row.action;
+          const endpointStr = row.endpoint ? ` | Endpoint: \`${row.endpoint}\`` : '';
+          const resourceStr = row.resource_type ? ` | Resource: \`${row.resource_type}${row.resource_id ? `#${row.resource_id}` : ''}\`` : '';
+          const actionStr = missingActorLog ? `AUDIT_MISSING_ACTOR(${row.action})` : row.action;
           const severityTag = ['HIGH', 'CRITICAL'].includes(row.severity) ? ` [🔴 ${row.severity}]` : '';
 
-          return `${idx + 1}. ${icon} *${actionStr}* bởi ${userStr}${severityTag} lúc \`${time}\`${ipStr}`;
+          return `${idx + 1}. ${icon} *${actionStr}* bởi ${userStr}${severityTag} lúc \`${time}\`${ipStr}${endpointStr}${resourceStr}`;
         }).join('\n') || '_Không có hoạt động nào được ghi nhận._';
 
         // Query sự kiện HIGH/CRITICAL gần nhất
         const recentRes = await pool.query<{
+          event_type: string;
           action: string;
-          user_email: string;
+          user_email: string | null;
           severity: string;
           created_at: string;
         }>(
-          `SELECT action, user_email, severity, created_at 
+          `SELECT event_type, action, user_email, severity, created_at 
            FROM public.security_audit_logs 
            WHERE severity IN ('HIGH', 'CRITICAL') AND created_at > NOW() - INTERVAL '24 hours'
            ORDER BY created_at DESC
@@ -419,7 +432,8 @@ export async function POST(request: NextRequest) {
         const recentLines = recentRes.rows.map((row, idx) => {
           const time = new Date(row.created_at).toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
           const sevIcon = row.severity === 'CRITICAL' ? '🚨' : '🔴';
-          return `${idx + 1}. ${sevIcon} [${row.severity}] *${row.action}*\n    👤 Đối tượng: \`${row.user_email ?? 'anonymous'}\` | 🕐 Lúc: \`${time}\``;
+          const actor = row.user_email ?? (row.event_type === 'SYSTEM' ? 'system-event' : 'invalid-session-email');
+          return `${idx + 1}. ${sevIcon} [${row.severity}] *${row.action}*\n    👤 Đối tượng: \`${actor}\` | 🕐 Lúc: \`${time}\``;
         }).join('\n\n') || '🟢 Không phát hiện sự cố nghiêm trọng nào.';
 
         const reply = [

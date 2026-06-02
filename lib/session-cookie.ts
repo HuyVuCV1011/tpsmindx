@@ -2,6 +2,7 @@ import { jwtVerify } from 'jose';
 import type { NextResponse } from 'next/server';
 
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { normalizeAuthenticatedEmail } from '@/lib/security-identity';
 
 /** Tên cookie phiên (HttpOnly, set từ API login). */
 export const TPS_SESSION_COOKIE = 'tps_session';
@@ -28,8 +29,7 @@ export async function verifySessionCookieValue(
       new TextEncoder().encode(getJwtSecret()),
       { algorithms: ['HS256'] },
     );
-    const email =
-      typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
+    const email = normalizeAuthenticatedEmail(payload.email);
     if (!email) return null;
     const ap =
       payload.ap === true ||

@@ -1,4 +1,5 @@
 import { getAccessibleCenters } from '@/lib/center-access'
+import { filterManagementPermissions } from '@/lib/admin-permission-routes'
 import pool from '@/lib/db'
 
 export type AppUserAccess = {
@@ -106,7 +107,7 @@ export async function resolveAppUserAccessForEmail(
       allPerms.add(r.route_path),
     )
 
-    const permissions = Array.from(allPerms)
+    const permissions = filterManagementPermissions(Array.from(allPerms))
     const roleCodes = userRoles.rows.map((r: { role_code: string }) =>
       (r.role_code || '').toUpperCase(),
     )
