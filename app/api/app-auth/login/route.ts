@@ -3,14 +3,29 @@ import { checkTeacherExistsByEmail, isDatabaseUnavailableError } from '@/lib/db-
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { clientIpFromRequest, rateLimitOr429 } from '@/lib/rate-limit-memory';
 import { setSessionCookieOnResponse } from '@/lib/session-cookie';
+import { logLoginFailed, logLoginSuccess } from '@/lib/audit-logger';
+import { checkAndRecordThreat, isIpBlocked } from '@/lib/brute-force-guard';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
+  const ip        = clientIpFromRequest(request) ?? 'unknown';
+  const userAgent = request.headers.get('user-agent') ?? '';
+  const endpoint  = 'POST /api/app-auth/login';
+
   try {
+    // ── Kiểm tra IP có đang bị block do brute force không ──
+    const blockStatus = await isIpBlocked(ip);
+    if (blockStatus.blocked) {
+      return NextResponse.json(
+        { error: 'Quá nhiều lần thử đăng nhập. Vui lòng thử lại sau.' },
+        { status: 429 },
+      );
+    }
+
     const rl = rateLimitOr429(
-      `app-auth-login:${clientIpFromRequest(request)}`,
+      `app-auth-login:${ip}`,
       40,
       60_000,
     );
@@ -60,6 +75,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (userResult.rows.length === 0) {
+      // Ghi log thất bại + kiểm tra brute force
+      logLoginFailed({ email: normalizedInput, ip, userAgent, reason: 'user_not_found' });
+      await checkAndRecordThreat(ip, 'LOGIN_FAIL');
       return NextResponse.json({ appUser: false });
     }
 
@@ -70,11 +88,21 @@ export async function POST(request: NextRequest) {
     }
 
     if (!user.password_hash) {
+      logLoginFailed({ email: normalizedInput, ip, userAgent, reason: 'no_password_hash' });
       return NextResponse.json({ error: 'Tài khoản không có mật khẩu hợp lệ.' }, { status: 401 });
     }
 
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
+      // Ghi log thất bại + kiểm tra brute force
+      logLoginFailed({ email: normalizedInput, ip, userAgent, reason: 'wrong_password' });
+      const threat = await checkAndRecordThreat(ip, 'LOGIN_FAIL');
+      if (threat.blocked) {
+        return NextResponse.json(
+          { error: `Quá nhiều lần thử. IP bị block 30 phút.` },
+          { status: 429 },
+        );
+      }
       return NextResponse.json({ error: 'Email hoặc mật khẩu không chính xác' }, { status: 401 });
     }
 
@@ -132,6 +160,15 @@ export async function POST(request: NextRequest) {
       teacherSync: { foundInDatabase: teacherFoundInDb },
     });
     setSessionCookieOnResponse(res, token);
+
+    // ── Ghi audit log đăng nhập thành công ──
+    logLoginSuccess({
+      email:     user.email,
+      role:      user.role,
+      ip,
+      userAgent,
+    });
+
     return res;
   } catch (error: unknown) {
     console.error('App auth login error:', error);
