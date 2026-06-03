@@ -7,8 +7,10 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 const scriptSrc = [
   "'self'",
-  ...(isProduction ? [] : ["'unsafe-inline'", "'unsafe-eval'"]),
+  "'unsafe-inline'",
+  ...(isProduction ? [] : ["'unsafe-eval'"]),
 ];
+
 
 const contentSecurityPolicy = [
   "default-src 'self'",
