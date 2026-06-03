@@ -18,7 +18,7 @@ export default function Home() {
     }
 
     // Chưa đăng nhập → redirect đến login
-    if (!token || !user) {
+    if (!user) {
       logger.info('Root: No auth found, redirecting to login')
       router.replace('/login')
       return

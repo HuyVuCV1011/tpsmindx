@@ -151,8 +151,6 @@ export default function LoginPage() {
         appUser?: boolean;
         error?: string;
         dbUnavailable?: boolean;
-        idToken?: string;
-        accessToken?: string;
         email?: string;
         displayName?: string;
         role?: string;
@@ -168,7 +166,7 @@ export default function LoginPage() {
       }
 
       if (appAuthData.appUser === true) {
-        if (!appAuthData.idToken || !appAuthData.localId) {
+        if (!appAuthData.localId) {
           throw new Error('Phản hồi đăng nhập app không đầy đủ. Vui lòng thử lại.');
         }
 
@@ -183,8 +181,7 @@ export default function LoginPage() {
           permissions: appAuthData.permissions ?? [],
         };
 
-        // Ưu tiên dùng accessToken (JWT nội bộ) làm Bearer; fallback idToken Firebase
-        updateUser(userData, appAuthData.accessToken || appAuthData.idToken);
+        updateUser(userData, '');
 
         const landing = resolvePostLoginPath({
           accountRole: appAuthData.role as AppRole | undefined,
@@ -281,8 +278,7 @@ export default function LoginPage() {
       }
 
       persistRememberedAccount(trimmedEmail, role);
-      // Ưu tiên dùng accessToken (JWT nội bộ HS256) làm Bearer; fallback idToken Firebase
-      updateUser(userData, data.accessToken || data.idToken);
+      updateUser(userData, '');
 
       logger.info('Redirecting to', { path: finalRedirectPath });
       setTimeout(() => { router.replace(finalRedirectPath); }, 500);

@@ -1,7 +1,7 @@
 import pool from '@/lib/db';
 import { checkTeacherExistsByEmail, isDatabaseUnavailableError } from '@/lib/db-helpers';
 import { getJwtSecret } from '@/lib/jwt-secret';
-import { clientIpFromRequest, rateLimitOr429 } from '@/lib/rate-limit-memory';
+import { clientIpFromRequest, rateLimitOr429Async } from '@/lib/rate-limit-memory';
 import { setSessionCookieOnResponse } from '@/lib/session-cookie';
 import { logLoginFailed, logLoginSuccess } from '@/lib/audit-logger';
 import { filterManagementPermissions } from '@/lib/admin-permission-routes';
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const rl = rateLimitOr429(
+    const rl = await rateLimitOr429Async(
       `app-auth-login:${ip}`,
       40,
       60_000,
@@ -145,9 +145,6 @@ export async function POST(request: NextRequest) {
 
     const res = NextResponse.json({
       appUser: true,
-      idToken: token,
-      /** JWT nội bộ HS256 — alias của idToken (cùng giá trị), dùng làm Bearer cho /api/check-admin */
-      accessToken: token,
       email: user.email,
       localId: `app_${user.id}`,
       displayName: user.display_name,

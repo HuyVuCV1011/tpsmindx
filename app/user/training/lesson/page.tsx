@@ -23,7 +23,7 @@ interface Question {
   time: number
   question: string
   options: string[]
-  answer: number
+  answer: number | null
 }
 
 interface TrainingVideoSegment {
@@ -694,8 +694,7 @@ function LessonContent() {
               typeof question.options === 'string'
                 ? (JSON.parse(question.options) as string[])
                 : question.options || [],
-            answer:
-              Number.parseInt(String(question.correct_answer ?? 0), 10) || 0,
+            answer: null,
           }))
           setQuestions(loadedQuestions)
         } else {
@@ -1086,16 +1085,48 @@ function LessonContent() {
     }
   }, [currentTime, duration])
 
-  const handleAnswerQuestion = () => {
+  const handleAnswerQuestion = async () => {
     if (currentQuestionIdx === null || userAnswer === null) return
 
     const question = questions[currentQuestionIdx]
-    const isCorrect = userAnswer === question.answer
+    try {
+      const response = await fetch('/api/training-video-questions/answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question_id: question.id,
+          selected_answer: userAnswer,
+          teacher_code: teacherProfile?.code || '',
+        }),
+      })
+      const data = await response.json()
+      if (!data.success) {
+        flatToast.error(data.error || 'Không thể kiểm tra đáp án')
+        return
+      }
 
-    // Mark as answered
-    setAnsweredQuestions((prev) => new Set([...prev, question.id]))
-    setIsCorrectAnswer(isCorrect)
-    setShowResult(true)
+      const correctAnswer =
+        typeof data.correct_answer === 'number'
+          ? data.correct_answer
+          : Number.parseInt(String(data.correct_answer ?? ''), 10)
+      const normalizedCorrectAnswer = Number.isFinite(correctAnswer)
+        ? correctAnswer
+        : null
+
+      setQuestions((prev) =>
+        prev.map((item) =>
+          item.id === question.id
+            ? { ...item, answer: normalizedCorrectAnswer }
+            : item,
+        ),
+      )
+      setAnsweredQuestions((prev) => new Set([...prev, question.id]))
+      setIsCorrectAnswer(Boolean(data.correct))
+      setShowResult(true)
+    } catch (error) {
+      console.error('[Lesson] Failed to validate answer:', error)
+      flatToast.error('Không thể kiểm tra đáp án')
+    }
   }
 
   const handleContinue = () => {
