@@ -13,26 +13,24 @@ const SAVED_LOGIN_KEY = 'tps_saved_login_account';
 type LandingRole = 'teacher' | 'manager';
 type AppRole = LandingRole | 'super_admin' | 'admin' | 'hr';
 
-const ADMIN_LANDING_ROLES = new Set<AppRole>(['super_admin', 'admin', 'hr']);
-
 function resolveTeacherLanding(teacherSync?: { foundInDatabase?: boolean }): string {
   return teacherSync?.foundInDatabase ? '/user/truyenthong' : '/checkdatasource'
 }
 
 function resolvePostLoginPath(options: {
-  accountRole?: AppRole;
   selectedRole: LandingRole;
   isAdmin: boolean;
   teacherSync?: { foundInDatabase?: boolean };
 }): { redirectPath: string; isAdminLanding: boolean } {
-  const { accountRole, selectedRole, isAdmin, teacherSync } = options;
-  const isAdminLanding =
-    Boolean(accountRole && ADMIN_LANDING_ROLES.has(accountRole)) ||
-    (selectedRole === 'manager' && isAdmin);
+  const { selectedRole, isAdmin, teacherSync } = options;
+  const isAdminLanding = selectedRole === 'manager' && isAdmin;
+  const isTeacherLandingForPrivilegedUser = selectedRole === 'teacher' && isAdmin;
 
   return {
     redirectPath: isAdminLanding
       ? '/admin/dashboard'
+      : isTeacherLandingForPrivilegedUser
+        ? '/user/truyenthong'
       : resolveTeacherLanding(teacherSync),
     isAdminLanding,
   };
@@ -91,7 +89,6 @@ export default function LoginPage() {
       hasCheckedAuth.current = true;
       if (user) {
         const { redirectPath } = resolvePostLoginPath({
-          accountRole: user.role as AppRole | undefined,
           selectedRole: role,
           isAdmin: Boolean(user.isAdmin),
         });
@@ -184,7 +181,6 @@ export default function LoginPage() {
         updateUser(userData, '');
 
         const landing = resolvePostLoginPath({
-          accountRole: appAuthData.role as AppRole | undefined,
           selectedRole: role,
           isAdmin: Boolean(appAuthData.isAdmin),
           teacherSync: appAuthData.teacherSync,
@@ -253,7 +249,6 @@ export default function LoginPage() {
       logger.success('Firebase login successful', { email: userData.email, role: userData.role });
 
       const landing = resolvePostLoginPath({
-        accountRole: serverRole,
         selectedRole: role,
         isAdmin: Boolean(userData.isAdmin),
         teacherSync: data?.teacherSync,

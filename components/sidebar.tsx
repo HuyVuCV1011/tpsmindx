@@ -562,6 +562,10 @@ export function Sidebar() {
     }
   }
 
+  const profileHref = isUserArea ? '/user/profile' : user?.isAdmin ? '/admin/profile' : '/user/profile'
+  const canSwitchToManagement = Boolean(user?.isAdmin) && isUserArea
+  const canSwitchToTeacher = Boolean(user?.isAdmin) && !isUserArea
+
   const getTourTargetForHref = (href?: string) => {
     if (!href) return undefined
     const path = href.split('?')[0]
@@ -923,12 +927,38 @@ export function Sidebar() {
           {/* User Info and Logout - Modern card design */}
           {user && (
             <div className="shrink-0 border-t border-gray-200 bg-gray-50 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+              {canSwitchToManagement && (
+                <Button
+                  asChild
+                  variant="mindx"
+                  size="sm"
+                  className="mb-2 w-full justify-start text-xs"
+                >
+                  <Link href="/admin/dashboard" onClick={closeSidebarOnMobile}>
+                    <Icon icon={BarChart3} size="sm" />
+                    Chuyển sang quản lý
+                  </Link>
+                </Button>
+              )}
+              {canSwitchToTeacher && (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="mb-2 w-full justify-start border-[#a1001f]/30 text-xs text-[#a1001f] hover:bg-[#a1001f]/5 hover:text-[#a1001f]"
+                >
+                  <Link href="/user/truyenthong" onClick={closeSidebarOnMobile}>
+                    <Icon icon={GraduationCap} size="sm" />
+                    Chuyển sang giáo viên
+                  </Link>
+                </Button>
+              )}
               <Link
-                href={user.isAdmin ? '/admin/profile' : '/user/profile'}
+                href={profileHref}
                 onClick={closeSidebarOnMobile}
                 className={cn(
                   'mb-2 block cursor-pointer rounded-lg border p-2 shadow-sm transition-all duration-300 hover:scale-[1.01] hover:border-[#a1001f]/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a1001f] focus-visible:ring-offset-2',
-                  pathname === '/user/profile' || pathname === '/admin/profile'
+                  pathname === profileHref
                     ? 'bg-[#a1001f]/5 border-[#a1001f]'
                     : 'bg-white border-gray-100 hover:border-[#a1001f]/30',
                 )}
