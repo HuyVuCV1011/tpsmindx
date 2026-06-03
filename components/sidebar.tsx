@@ -7,6 +7,7 @@ import { isTempHiddenUserRoute } from '@/lib/temp-hidden-user-routes'
 import { cn } from '@/lib/utils'
 import {
   BarChart3,
+  Bell,
   BookOpen,
   CalendarDays,
   ChevronDown,
@@ -49,6 +50,13 @@ export function Sidebar() {
     fetcher,
   )
   const avatarUrl = avatarData?.data?.avatar_url || null
+
+  const { data: unreadData } = useSWR(
+    user?.email ? '/api/notifications/unread-count' : null,
+    fetcher,
+    { refreshInterval: 15000 }
+  )
+  const unreadCount = unreadData?.count || 0
 
   const closeSidebarOnMobile = useCallback(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
@@ -128,6 +136,7 @@ export function Sidebar() {
 
   const adminMenuItems = [
     { href: '/admin/dashboard', label: 'Bảng Điều Khiển', icon: Home },
+    { href: '/user/thong-bao', label: 'Thông báo', icon: Bell },
     {
       href: '/admin/truyenthong',
       label: 'Quản Lý Truyền Thông',
@@ -270,6 +279,7 @@ export function Sidebar() {
       label: 'Thông tin của tôi',
       icon: Home,
     },
+    { href: '/user/thong-bao', label: 'Thông báo', icon: Bell },
     {
       label: 'Lịch & Hoạt động',
       icon: CalendarDays,
@@ -898,6 +908,11 @@ export function Sidebar() {
                         <Icon className="h-3.5 w-3.5" />
                       </div>
                       <span>{toTitleCase(item.label)}</span>
+                      {item.label === 'Thông báo' && unreadCount > 0 && (
+                        <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white leading-none">
+                          {unreadCount}
+                        </span>
+                      )}
                     </Link>
                   )}
                 </div>

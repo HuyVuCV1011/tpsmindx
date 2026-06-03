@@ -2,6 +2,7 @@ import {
   resolveAppUserAccessForEmail,
   type AppUserAccess,
 } from '@/lib/app-user-access';
+import { requireSameOriginMutation } from '@/lib/api-security';
 import { requireBearerSession } from '@/lib/datasource-api-auth';
 import pool from '@/lib/db';
 import { normalizeAuthenticatedEmail } from '@/lib/security-identity';
@@ -110,10 +111,25 @@ export async function requireBearerDbRoles(
   return { ok: true, sessionEmail, role };
 }
 
+export async function requireBearerDbRolesMutation(
+  request: NextRequest,
+  allowedRoles: string[],
+): Promise<DbRoleResult> {
+  const originDenied = requireSameOriginMutation(request);
+  if (originDenied) return { ok: false, response: originDenied };
+  return requireBearerDbRoles(request, allowedRoles);
+}
+
 export async function requireBearerSuperAdmin(
   request: NextRequest,
 ): Promise<DbRoleResult> {
   return requireBearerDbRoles(request, ['super_admin']);
+}
+
+export async function requireBearerSuperAdminMutation(
+  request: NextRequest,
+): Promise<DbRoleResult> {
+  return requireBearerDbRolesMutation(request, ['super_admin']);
 }
 
 /** super_admin hoặc admin (quản trị nội dung / S3 manager). */
@@ -121,4 +137,10 @@ export async function requireBearerAdminOrSuper(
   request: NextRequest,
 ): Promise<DbRoleResult> {
   return requireBearerDbRoles(request, ['super_admin', 'admin']);
+}
+
+export async function requireBearerAdminOrSuperMutation(
+  request: NextRequest,
+): Promise<DbRoleResult> {
+  return requireBearerDbRolesMutation(request, ['super_admin', 'admin']);
 }

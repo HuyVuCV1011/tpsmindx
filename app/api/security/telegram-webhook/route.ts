@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const AUTHORIZED_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 
 interface TelegramMessage {
   message_id: number;
@@ -95,8 +96,13 @@ async function editMessageText(chatId: number, messageId: number, text: string):
 
 export async function POST(request: NextRequest) {
   try {
-    if (!TELEGRAM_BOT_TOKEN || !AUTHORIZED_CHAT_ID) {
+    if (!TELEGRAM_BOT_TOKEN || !AUTHORIZED_CHAT_ID || !TELEGRAM_WEBHOOK_SECRET) {
       return NextResponse.json({ error: 'Telegram environment variables not configured' }, { status: 500 });
+    }
+
+    const secretHeader = request.headers.get('x-telegram-bot-api-secret-token') || '';
+    if (secretHeader !== TELEGRAM_WEBHOOK_SECRET) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = (await request.json()) as TelegramWebhookBody;

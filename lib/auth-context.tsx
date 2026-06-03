@@ -166,10 +166,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(nextUser)
           localStorage.setItem('user', JSON.stringify(nextUser))
           logger.success('Auth restored from session cookie')
-        } else if (!cachedUser) {
+        } else {
+          localStorage.removeItem('user')
           setUser(null)
+          setToken(null)
+          logger.info('Auth session verification failed')
         }
-      } else if (response.status === 401 || response.status === 403) {
+      } else {
         localStorage.removeItem('user')
         setUser(null)
         setToken(null)
@@ -177,9 +180,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error: any) {
       logger.error('Error initializing auth', { error: error.message })
-      if (!cachedUser) {
-        setUser(null)
-      }
+      localStorage.removeItem('user')
+      setUser(null)
+      setToken(null)
     } finally {
       if (!cancelled) {
         setIsLoading(false)
