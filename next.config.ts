@@ -40,6 +40,16 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/login',
+        permanent: false,
+      },
+    ];
+  },
+
   async headers() {
     return [
       {
@@ -67,6 +77,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
   experimental: {
     webpackBuildWorker: false,
     serverSourceMaps: false,
