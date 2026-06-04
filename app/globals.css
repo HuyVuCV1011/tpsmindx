@@ -2636,9 +2636,9 @@ input[type='reset'] {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 16px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
   animation: fadeIn 0.4s ease-out;
 }
 
