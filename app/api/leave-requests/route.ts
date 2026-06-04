@@ -1,3 +1,25 @@
+/**
+ * ═══════════════════════════════════════════════════════════════════════
+ * app/api/leave-requests/route.ts — API quản lý đơn xin nghỉ giảo viên
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * ## PHÂN QUYỀN
+ *   GET (mode=admin)     : super_admin, admin, manager — theo cơ sở được phân công
+ *   GET (mode khác)     : Bearer/cookie hợp lệ, chỉ xem đơn của CHÍNH MÌNH
+ *   POST                : Bearer/cookie hợp lệ + CSRF check — tạo đơn xin nghỉ
+ *   PATCH               : Bearer/cookie hợp lệ + CSRF check, phân quyền theo action:
+ *     - admin_review    : admin/manager có quyền trên cơ sở tương ứng
+ *     - teacher_update  : chỉ giáo viên chủ đơn
+ *     - assign_substitute: admin/manager trên cơ sở tương ứng
+ *     - substitute_confirm/decline: chỉ giáo viên được phân công dạy thạy
+ *
+ * ## BẢO MẬT
+ *   - `requireSameOriginMutation` (POST/PATCH): ngăn CSRF tấn công tạo/thay đổi
+ *     đơn nghỉ giả mạo sử dụng cookie phiên của giáo viên
+ *   - `rejectIfEmailNotSelf`: giáo viên không thể nộp đơn dưới tên người khác
+ *   - Campus access control: manager chỉ thấy/xử lý đơn thuộc cơ sở quản lý
+ *   - DB role check (không tin role trong JWT)
+ */
 import { requireBearerDbRoles } from '@/lib/auth-server';
 import { normalizeText as normalizeCampusText } from '@/lib/campus-data';
 import { getAccessibleCenters } from '@/lib/center-access';
@@ -5,6 +27,7 @@ import {
     rejectIfEmailNotSelf,
     requireBearerSession,
 } from '@/lib/datasource-api-auth';
+import { requireSameOriginMutation } from '@/lib/api-security';
 import {
   SUBSTITUTE_DECLINE_AUDIT_PREFIX,
   stripSubstituteDeclineAuditFromAdminNote,
@@ -288,6 +311,10 @@ export async function POST(request: NextRequest) {
   let client;
 
   try {
+    // CSRF check: chặn tấn công cross-site tạo đơn nghỉ giả mạo qua cookie phiên
+    const csrfDenied = requireSameOriginMutation(request);
+    if (csrfDenied) return csrfDenied;
+
     const auth = await requireBearerSession(request);
     if (!auth.ok) return auth.response;
 
@@ -572,6 +599,10 @@ export async function PATCH(request: NextRequest) {
   let client;
 
   try {
+    // CSRF check: chặn tấn công cross-site phê duyệt/từ chối đơn nghỉ qua cookie phiên
+    const csrfDenied = requireSameOriginMutation(request);
+    if (csrfDenied) return csrfDenied;
+
     const auth = await requireBearerSession(request);
     if (!auth.ok) return auth.response;
 
