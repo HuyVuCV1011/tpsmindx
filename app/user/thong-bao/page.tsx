@@ -4,8 +4,7 @@ import { PageContainer } from '@/components/PageContainer';
 import { useAuth } from '@/lib/auth-context';
 import { authHeaders } from '@/lib/auth-headers';
 import { toast } from '@/lib/app-toast';
-import { Bell, Check } from 'lucide-react';
-import Link from 'next/link';
+import { Bell, Check, MailOpen, Trash2, Undo2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
@@ -189,6 +188,7 @@ export default function NotificationCenterPage() {
 
   // Settings states
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [busyNotificationId, setBusyNotificationId] = useState<number | null>(null);
 
   // Sync settings with browser APIs and localStorage
   useEffect(() => {
@@ -200,13 +200,24 @@ export default function NotificationCenterPage() {
   }, []);
 
   const fetcher = useMemo(
-    () => (url: string) =>
-      fetch(url, { headers: authHeaders(token) }).then((r) => r.json()),
+    () => async (url: string) => {
+      const response = await fetch(url, { headers: authHeaders(token) });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || data?.success === false) {
+        throw new Error(data?.error || 'Không thể tải dữ liệu thông báo');
+      }
+      return data;
+    },
     [token]
   );
 
-  const { data: notificationsData, mutate: mutateNotifications } = useSWR(
-    user?.email ? '/api/notifications' : null,
+  const {
+    data: notificationsData,
+    mutate: mutateNotifications,
+    error: notificationsError,
+    isLoading: isNotificationsLoading,
+  } = useSWR(
+    user?.email ? '/api/notifications?limit=100' : null,
     fetcher
   );
 
@@ -219,40 +230,138 @@ export default function NotificationCenterPage() {
   const notifications: Notification[] = notificationsData?.data || [];
   const unreadCount = unreadData?.count || 0;
 
+  const refreshNotificationData = () => {
+    void mutateNotifications();
+    void mutateUnread();
+  };
+
+  const resolveNotificationLink = (link: string | null) => {
+    if (!link) return null;
+    if (link === '/user/lich-cua-toi') {
+      return '/user/lich-cua-toi?tab=xin-nghi';
+    }
+    return link;
+  };
+
+  const assertMutationSuccess = async (response: Response) => {
+    const data = await response.json().catch(() => null);
+    if (!response.ok || data?.success === false) {
+      throw new Error(data?.error || 'Thao tác thông báo không thành công');
+    }
+    return data;
+  };
+
   // Mark single notification as read in background or with redirect
   const handleMarkAsRead = async (id: number, link: string | null) => {
     try {
-      await fetch('/api/notifications', {
+      const response = await fetch('/api/notifications', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           ...authHeaders(token),
         },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id, is_read: true }),
       });
-      void mutateNotifications();
-      void mutateUnread();
-      if (link) {
-        router.push(link);
+      await assertMutationSuccess(response);
+      refreshNotificationData();
+
+      const finalLink = resolveNotificationLink(link);
+      if (finalLink) {
+        router.push(finalLink);
       }
     } catch (err) {
       console.error('Error marking notification as read:', err);
     }
   };
 
-  // Mark all notifications as read
-  const handleMarkAllAsRead = async () => {
+  const handleSetReadState = async (
+    event: React.MouseEvent<HTMLButtonElement>,
+    item: Notification,
+    isRead: boolean,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (busyNotificationId === item.id) return;
+
     try {
-      await fetch('/api/notifications', {
+      setBusyNotificationId(item.id);
+      const response = await fetch('/api/notifications', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           ...authHeaders(token),
         },
-        body: JSON.stringify({ all: true }),
+        body: JSON.stringify({ id: item.id, is_read: isRead }),
       });
-      void mutateNotifications();
-      void mutateUnread();
+      await assertMutationSuccess(response);
+      refreshNotificationData();
+      toast.success(isRead ? 'Đã đánh dấu đã đọc' : 'Đã chuyển về chưa đọc');
+    } catch (err) {
+      console.error('Error updating notification read state:', err);
+      toast.error('Không thể cập nhật trạng thái thông báo');
+    } finally {
+      setBusyNotificationId(null);
+    }
+  };
+
+  const handleDeleteNotification = async (
+    event: React.MouseEvent<HTMLButtonElement>,
+    item: Notification,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (typeof window !== 'undefined' && !window.confirm('Xóa thông báo này?')) {
+      return;
+    }
+    if (busyNotificationId === item.id) return;
+
+    try {
+      setBusyNotificationId(item.id);
+      const response = await fetch('/api/notifications', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders(token),
+        },
+        body: JSON.stringify({ id: item.id }),
+      });
+      await assertMutationSuccess(response);
+      refreshNotificationData();
+      toast.success('Đã xóa thông báo');
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+      toast.error('Không thể xóa thông báo');
+    } finally {
+      setBusyNotificationId(null);
+    }
+  };
+
+  const handleOpenNotification = (item: Notification) => {
+    if (!item.is_read) {
+      void handleMarkAsRead(item.id, null);
+    }
+
+    const finalLink = resolveNotificationLink(item.link);
+    if (finalLink) {
+      router.push(finalLink);
+    }
+  };
+
+  // Mark all notifications as read
+  const handleMarkAllAsRead = async () => {
+    try {
+      const response = await fetch('/api/notifications', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders(token),
+        },
+        body: JSON.stringify({ all: true, is_read: true }),
+      });
+      await assertMutationSuccess(response);
+      refreshNotificationData();
       toast.success('Đã đánh dấu tất cả thông báo là đã đọc');
     } catch (err) {
       console.error('Error marking all as read:', err);
@@ -396,6 +505,7 @@ export default function NotificationCenterPage() {
 
   return (
     <PageContainer
+      className="notifications-page-shell"
       title="Trung tâm thông báo"
       description="Xem và quản lý các cập nhật quan trọng về lịch làm việc, kiểm tra chuyên môn, và lương thưởng của bạn."
     >
@@ -545,7 +655,22 @@ export default function NotificationCenterPage() {
             </div>
           ) : (
             <div className="page-module__Qo6x2W__notificationList">
-              {categoryFilteredNotifications.length === 0 ? (
+              {notificationsError ? (
+                <div className="p-16 text-center text-sm text-gray-500">
+                  <p>Không tải được danh sách thông báo.</p>
+                  <button
+                    type="button"
+                    className="mt-3 rounded-lg border border-[#a1001f]/30 px-3 py-1.5 text-xs font-semibold text-[#a1001f] hover:bg-[#a1001f]/5"
+                    onClick={() => void mutateNotifications()}
+                  >
+                    Tải lại
+                  </button>
+                </div>
+              ) : isNotificationsLoading && notifications.length === 0 ? (
+                <div className="p-16 text-center text-sm text-gray-500">
+                  Đang tải thông báo...
+                </div>
+              ) : categoryFilteredNotifications.length === 0 ? (
                 <div className="p-16 text-center text-sm text-gray-500">
                   Không tìm thấy thông báo nào trong danh mục này.
                 </div>
@@ -566,32 +691,12 @@ export default function NotificationCenterPage() {
                       }`}
                       role="button"
                       tabIndex={0}
-                      onClick={() => {
-                        // Mark as read in the background if unread
-                        if (!item.is_read) {
-                          void handleMarkAsRead(item.id, null);
-                        }
-                        if (item.link) {
-                          let finalLink = item.link;
-                          if (item.link === '/user/lich-cua-toi') {
-                            finalLink = '/user/lich-cua-toi?tab=xin-nghi';
-                          }
-                          router.push(finalLink);
-                        }
-                      }}
+                      onClick={() => handleOpenNotification(item)}
                       onKeyDown={(e) => {
+                        if ((e.target as HTMLElement).closest('button')) return;
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
-                          if (!item.is_read) {
-                            void handleMarkAsRead(item.id, null);
-                          }
-                          if (item.link) {
-                            let finalLink = item.link;
-                            if (item.link === '/user/lich-cua-toi') {
-                              finalLink = '/user/lich-cua-toi?tab=xin-nghi';
-                            }
-                            router.push(finalLink);
-                          }
+                          handleOpenNotification(item);
                         }
                       }}
                     >
@@ -629,7 +734,40 @@ export default function NotificationCenterPage() {
                           </span>
                         )}
                       </div>
-                      
+
+                      <div className="page-module__Qo6x2W__notifActions">
+                        <button
+                          type="button"
+                          className="page-module__Qo6x2W__notifActionBtn"
+                          title={item.is_read ? 'Đánh dấu chưa đọc' : 'Đánh dấu đã đọc'}
+                          aria-label={item.is_read ? 'Đánh dấu chưa đọc' : 'Đánh dấu đã đọc'}
+                          disabled={busyNotificationId === item.id}
+                          onClick={(event) => handleSetReadState(event, item, !item.is_read)}
+                        >
+                          {item.is_read ? (
+                            <Undo2 className="h-3.5 w-3.5" />
+                          ) : (
+                            <MailOpen className="h-3.5 w-3.5" />
+                          )}
+                          <span className="page-module__Qo6x2W__notifActionText">
+                            {item.is_read ? 'Chưa đọc' : 'Đã đọc'}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className="page-module__Qo6x2W__notifActionBtn page-module__Qo6x2W__notifActionDanger"
+                          title="Xóa thông báo"
+                          aria-label="Xóa thông báo"
+                          disabled={busyNotificationId === item.id}
+                          onClick={(event) => handleDeleteNotification(event, item)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span className="page-module__Qo6x2W__notifActionText">
+                            Xóa
+                          </span>
+                        </button>
+                      </div>
+
                       {!item.is_read && (
                         <div className="page-module__Qo6x2W__unreadDot"></div>
                       )}
