@@ -12,13 +12,27 @@ export default function Home() {
   const { user, token, isLoading } = useAuth()
 
   useEffect(() => {
+    // 1. Kiểm tra nhanh localStorage để redirect đến login ngay lập tức cho guest user
+    try {
+      const storedUser = localStorage.getItem('user')
+      if (!storedUser) {
+        logger.info('Root: No cached user in localStorage, redirecting to login immediately')
+        router.replace('/login')
+        return
+      }
+    } catch (err) {
+      router.replace('/login')
+      return
+    }
+
+    // 2. Chờ tải thông tin phiên đăng nhập nếu đã có dữ liệu cache trong localStorage
     if (isLoading) {
       logger.info('Root: Waiting for auth context to load...')
       return
     }
 
-    // Chưa đăng nhập → redirect đến login
-    if (!token || !user) {
+    // 3. Dự phòng: Nếu đã load xong auth context mà vẫn không có user hợp lệ
+    if (!user) {
       logger.info('Root: No auth found, redirecting to login')
       router.replace('/login')
       return
@@ -54,6 +68,13 @@ export default function Home() {
           `/api/checkdatasource/status?email=${encodeURIComponent(user.email)}&brief=1`,
           { cache: 'no-store', headers: authHeaders(token) },
         )
+        
+        if (res.status === 401 || res.status === 403) {
+          logger.info('Root: Session expired or unauthorized (401/403), redirecting to login')
+          router.replace('/login')
+          return
+        }
+
         const data = (await res.json()) as {
           success?: boolean
           exists?: boolean
@@ -84,12 +105,16 @@ export default function Home() {
           router.replace('/checkdatasource')
           return
         }
-      } catch {
-        /* fall through */
+      } catch (err) {
+        logger.error('Root: Error checking teacher status', err)
       }
-      logger.info('Root: Redirecting to checkdatasource')
-      router.replace('/checkdatasource')
+      
+      // Fallback: Khi xảy ra lỗi mạng hoặc lỗi server khác (không phải 401/403/teacher_missing),
+      // chuyển hướng tới thông tin GV dưới dạng degraded mode thay vì ép vào checkdatasource.
+      logger.warn('Root: Unexpected check error, falling back to user area')
+      router.replace('/user/thongtingv')
     }
+
     void run()
   }, [user, token, isLoading, router])
 

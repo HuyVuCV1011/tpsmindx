@@ -1,3 +1,25 @@
+/**
+ * ═══════════════════════════════════════════════════════════════════════
+ * app/api/leave-requests/route.ts — API quản lý đơn xin nghỉ giảo viên
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * ## PHÂN QUYỀN
+ *   GET (mode=admin)     : super_admin, admin, manager — theo cơ sở được phân công
+ *   GET (mode khác)     : Bearer/cookie hợp lệ, chỉ xem đơn của CHÍNH MÌNH
+ *   POST                : Bearer/cookie hợp lệ + CSRF check — tạo đơn xin nghỉ
+ *   PATCH               : Bearer/cookie hợp lệ + CSRF check, phân quyền theo action:
+ *     - admin_review    : admin/manager có quyền trên cơ sở tương ứng
+ *     - teacher_update  : chỉ giáo viên chủ đơn
+ *     - assign_substitute: admin/manager trên cơ sở tương ứng
+ *     - substitute_confirm/decline: chỉ giáo viên được phân công dạy thạy
+ *
+ * ## BẢO MẬT
+ *   - `requireSameOriginMutation` (POST/PATCH): ngăn CSRF tấn công tạo/thay đổi
+ *     đơn nghỉ giả mạo sử dụng cookie phiên của giáo viên
+ *   - `rejectIfEmailNotSelf`: giáo viên không thể nộp đơn dưới tên người khác
+ *   - Campus access control: manager chỉ thấy/xử lý đơn thuộc cơ sở quản lý
+ *   - DB role check (không tin role trong JWT)
+ */
 import { requireBearerDbRoles } from '@/lib/auth-server';
 import { normalizeText as normalizeCampusText } from '@/lib/campus-data';
 import { getAccessibleCenters } from '@/lib/center-access';
@@ -5,6 +27,7 @@ import {
     rejectIfEmailNotSelf,
     requireBearerSession,
 } from '@/lib/datasource-api-auth';
+import { requireSameOriginMutation } from '@/lib/api-security';
 import {
   SUBSTITUTE_DECLINE_AUDIT_PREFIX,
   stripSubstituteDeclineAuditFromAdminNote,
@@ -12,6 +35,7 @@ import {
 } from '@/lib/leave-request-admin-note-sanitize';
 import { getPublicBaseUrl } from '@/lib/public-base-url';
 import pool from '@/lib/db';
+import { createNotification } from '@/lib/notification-service';
 import { NextRequest, NextResponse } from 'next/server';
 
 type LeaveStatus =
@@ -287,6 +311,10 @@ export async function POST(request: NextRequest) {
   let client;
 
   try {
+    // CSRF check: chặn tấn công cross-site tạo đơn nghỉ giả mạo qua cookie phiên
+    const csrfDenied = requireSameOriginMutation(request);
+    if (csrfDenied) return csrfDenied;
+
     const auth = await requireBearerSession(request);
     if (!auth.ok) return auth.response;
 
@@ -526,11 +554,32 @@ export async function POST(request: NextRequest) {
     ];
 
     const result = await client.query(insertQuery, values);
+    const newRequest = result.rows[0];
+
+    // Gửi thông báo trong app cho GV xin nghỉ
+    await createNotification({
+      recipientEmail: email,
+      title: 'Đã gửi yêu cầu xin nghỉ',
+      content: `Yêu cầu xin nghỉ lớp ${trimmedClassCode} ngày ${leave_date} của bạn đã được gửi và đang chờ TC/Leader duyệt.`,
+      type: 'leave_request',
+      link: `/user/lich-cua-toi?tab=xin-nghi&id=${newRequest.id}`,
+    }).catch(err => console.error('Notification error:', err));
+
+    // Nếu có GV dạy thay, gửi thông báo cho họ
+    if (normalizedHasSubstitute && substitute_email) {
+      await createNotification({
+        recipientEmail: substitute_email,
+        title: 'Lời mời dạy thay lớp mới',
+        content: `Giáo viên ${teacher_name} mời bạn dạy thay lớp ${trimmedClassCode} vào ngày ${leave_date}. Vui lòng vào lịch cá nhân để xác nhận.`,
+        type: 'leave_request',
+        link: `/user/lich-cua-toi?tab=nhan-lop&id=${newRequest.id}`,
+      }).catch(err => console.error('Notification error:', err));
+    }
 
     return NextResponse.json({
       success: true,
       message: 'Tạo yêu cầu xin nghỉ thành công',
-      data: result.rows[0]
+      data: newRequest
     });
   } catch (error: any) {
     console.error('leave-requests POST error:', error);
@@ -550,6 +599,10 @@ export async function PATCH(request: NextRequest) {
   let client;
 
   try {
+    // CSRF check: chặn tấn công cross-site phê duyệt/từ chối đơn nghỉ qua cookie phiên
+    const csrfDenied = requireSameOriginMutation(request);
+    if (csrfDenied) return csrfDenied;
+
     const auth = await requireBearerSession(request);
     if (!auth.ok) return auth.response;
 
@@ -632,7 +685,12 @@ export async function PATCH(request: NextRequest) {
             `${getPublicBaseUrl()}/api/emails`,
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                ...(process.env.INTERNAL_API_SECRET
+                  ? { 'x-internal-api-secret': process.env.INTERNAL_API_SECRET }
+                  : {}),
+              },
               body: JSON.stringify({
                 type: 'leave_admin_rejected',
                 data: {
@@ -687,6 +745,15 @@ export async function PATCH(request: NextRequest) {
           console.error('leave-requests admin_review reject email error:', mailError);
         }
 
+        // Gửi thông báo trong app
+        await createNotification({
+          recipientEmail: String(rejectedRow.email ?? ''),
+          title: 'Yêu cầu xin nghỉ bị từ chối',
+          content: `Yêu cầu xin nghỉ lớp ${rejectedRow.class_code} ngày ${rejectedRow.leave_date} của bạn đã bị từ chối.`,
+          type: 'leave_request',
+          link: `/user/lich-cua-toi?tab=xin-nghi&id=${rejectedRow.id}`,
+        }).catch(err => console.error('Notification error:', err));
+
         return NextResponse.json({ success: true, data: rejectedRow });
       }
 
@@ -720,7 +787,29 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ success: false, error: 'Không tìm thấy yêu cầu' }, { status: 404 });
       }
 
-      return NextResponse.json({ success: true, data: approvedResult.rows[0] });
+      const approvedRow = approvedResult.rows[0];
+
+      // Gửi thông báo trong app cho GV xin nghỉ
+      await createNotification({
+        recipientEmail: String(approvedRow.email ?? ''),
+        title: 'Yêu cầu xin nghỉ đã được duyệt',
+        content: `Yêu cầu xin nghỉ lớp ${approvedRow.class_code} ngày ${approvedRow.leave_date} của bạn đã được duyệt.`,
+        type: 'leave_request',
+        link: `/user/lich-cua-toi?tab=xin-nghi&id=${approvedRow.id}`,
+      }).catch(err => console.error('Notification error:', err));
+
+      // Nếu có phân công GV dạy thay, gửi thông báo cho GV dạy thay
+      if (approvedRow.substitute_email) {
+        await createNotification({
+          recipientEmail: String(approvedRow.substitute_email),
+          title: 'Lời mời dạy thay lớp mới',
+          content: `Bạn được phân công dạy thay lớp ${approvedRow.class_code} vào ngày ${approvedRow.leave_date}. Vui lòng vào lịch cá nhân để xác nhận.`,
+          type: 'leave_request',
+          link: `/user/lich-cua-toi?tab=nhan-lop&id=${approvedRow.id}`,
+        }).catch(err => console.error('Notification error:', err));
+      }
+
+      return NextResponse.json({ success: true, data: approvedRow });
     }
 
     if (action === 'teacher_update') {
@@ -1142,7 +1231,20 @@ export async function PATCH(request: NextRequest) {
         );
       }
 
-      return NextResponse.json({ success: true, data: assignResult.rows[0] });
+      const assignedRow = assignResult.rows[0];
+
+      // Gửi thông báo trong app cho GV được phân công dạy thay
+      if (assignedRow.substitute_email) {
+        await createNotification({
+          recipientEmail: String(assignedRow.substitute_email),
+          title: 'Lời mời dạy thay lớp mới',
+          content: `Bạn được phân công dạy thay lớp ${assignedRow.class_code} vào ngày ${assignedRow.leave_date}. Vui lòng vào lịch cá nhân để xác nhận.`,
+          type: 'leave_request',
+          link: `/user/lich-cua-toi?tab=nhan-lop&id=${assignedRow.id}`,
+        }).catch(err => console.error('Notification error:', err));
+      }
+
+      return NextResponse.json({ success: true, data: assignedRow });
     }
 
     if (action === 'admin_save_fields') {
@@ -1268,7 +1370,12 @@ export async function PATCH(request: NextRequest) {
       try {
         await fetch(`${getPublicBaseUrl()}/api/emails`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(process.env.INTERNAL_API_SECRET
+              ? { 'x-internal-api-secret': process.env.INTERNAL_API_SECRET }
+              : {}),
+          },
           body: JSON.stringify({
             type: 'leave_approved_substitute_confirmed',
             data: {
@@ -1295,6 +1402,26 @@ export async function PATCH(request: NextRequest) {
         });
       } catch (mailError) {
         console.error('leave-requests substitute_confirm email error:', mailError);
+      }
+
+      // Gửi thông báo trong app cho GV xin nghỉ
+      await createNotification({
+        recipientEmail: String(confirmedRow.email ?? ''),
+        title: 'Giáo viên đã xác nhận dạy thay',
+        content: `Giáo viên ${confirmedRow.substitute_teacher} đã xác nhận dạy thay cho lớp ${confirmedRow.class_code} ngày ${confirmedRow.leave_date}.`,
+        type: 'leave_request',
+        link: `/user/lich-cua-toi?tab=xin-nghi&id=${confirmedRow.id}`,
+      }).catch(err => console.error('Notification error:', err));
+
+      // Gửi thông báo trong app cho admin
+      if (confirmedRow.admin_email) {
+        await createNotification({
+          recipientEmail: String(confirmedRow.admin_email),
+          title: 'Giáo viên dạy thay đã xác nhận',
+          content: `Giáo viên ${confirmedRow.substitute_teacher} đã xác nhận dạy thay cho lớp ${confirmedRow.class_code} ngày ${confirmedRow.leave_date}.`,
+          type: 'leave_request',
+          link: `/admin/xin-nghi-mot-buoi?id=${confirmedRow.id}`,
+        }).catch(err => console.error('Notification error:', err));
       }
 
       const outRow = auth.privileged
@@ -1378,6 +1505,26 @@ export async function PATCH(request: NextRequest) {
               declined.admin_note as string | null | undefined,
             ),
           };
+      // Gửi thông báo trong app cho GV xin nghỉ
+      await createNotification({
+        recipientEmail: String(declined.email ?? ''),
+        title: 'Giáo viên từ chối dạy thay',
+        content: `Giáo viên đã từ chối lời mời dạy thay lớp ${declined.class_code} ngày ${declined.leave_date}.`,
+        type: 'leave_request',
+        link: `/user/lich-cua-toi?tab=xin-nghi&id=${declined.id}`,
+      }).catch(err => console.error('Notification error:', err));
+
+      // Gửi thông báo trong app cho admin
+      if (declined.admin_email) {
+        await createNotification({
+          recipientEmail: String(declined.admin_email),
+          title: 'Giáo viên dạy thay đã từ chối',
+          content: `Giáo viên đã từ chối lời mời dạy thay lớp ${declined.class_code} ngày ${declined.leave_date}.`,
+          type: 'leave_request',
+          link: `/admin/xin-nghi-mot-buoi?id=${declined.id}`,
+        }).catch(err => console.error('Notification error:', err));
+      }
+
       return NextResponse.json({ success: true, data: outDeclined });
     }
 

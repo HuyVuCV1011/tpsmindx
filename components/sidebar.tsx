@@ -1,11 +1,13 @@
 'use client'
 
 import { useAuth } from '@/lib/auth-context'
+import { filterManagementPermissions } from '@/lib/admin-permission-routes'
 import { useSidebar } from '@/lib/sidebar-context'
 import { isTempHiddenUserRoute } from '@/lib/temp-hidden-user-routes'
 import { cn } from '@/lib/utils'
 import {
   BarChart3,
+  Bell,
   BookOpen,
   CalendarDays,
   ChevronDown,
@@ -29,6 +31,7 @@ import { Button } from '@/components/ui/button'
 import { Icon } from '@/components/ui/primitives/icon'
 import { authHeaders } from '@/lib/auth-headers'
 import useSWR from 'swr'
+import NotificationBell from '@/components/NotificationBell'
 
 export function Sidebar() {
   const { isOpen, setIsOpen, requestExpandLabels } = useSidebar()
@@ -48,6 +51,13 @@ export function Sidebar() {
     fetcher,
   )
   const avatarUrl = avatarData?.data?.avatar_url || null
+
+  const { data: unreadData } = useSWR(
+    user?.email ? '/api/notifications/unread-count' : null,
+    fetcher,
+    { refreshInterval: 15000 }
+  )
+  const unreadCount = unreadData?.count || 0
 
   const closeSidebarOnMobile = useCallback(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
@@ -127,6 +137,7 @@ export function Sidebar() {
 
   const adminMenuItems = [
     { href: '/admin/dashboard', label: 'Bảng Điều Khiển', icon: Home },
+    { href: '/user/thong-bao', label: 'Thông báo', icon: Bell },
     {
       href: '/admin/truyenthong',
       label: 'Quản Lý Truyền Thông',
@@ -269,6 +280,7 @@ export function Sidebar() {
       label: 'Thông tin của tôi',
       icon: Home,
     },
+    { href: '/user/thong-bao', label: 'Thông báo', icon: Bell },
     {
       label: 'Lịch & Hoạt động',
       icon: CalendarDays,
@@ -361,7 +373,7 @@ export function Sidebar() {
 
     // manager và admin luôn có quyền truy cập deal-luong
     const DEAL_LUONG_ROUTES = ['/admin/deal-luong', '/admin/tao-deal-luong']
-    const basePermissions = user.permissions || []
+    const basePermissions = filterManagementPermissions(user.permissions || [])
     const permissions = ['manager', 'admin'].includes(normalizedRole)
       ? Array.from(new Set([...basePermissions, ...DEAL_LUONG_ROUTES]))
       : basePermissions
@@ -551,6 +563,10 @@ export function Sidebar() {
     }
   }
 
+  const profileHref = isUserArea ? '/user/profile' : user?.isAdmin ? '/admin/profile' : '/user/profile'
+  const canSwitchToManagement = Boolean(user?.isAdmin) && isUserArea
+  const canSwitchToTeacher = Boolean(user?.isAdmin) && !isUserArea
+
   const getTourTargetForHref = (href?: string) => {
     if (!href) return undefined
     const path = href.split('?')[0]
@@ -593,13 +609,16 @@ export function Sidebar() {
                 </p>
               </div>
             </Link>
-            <button
-              onClick={() => setIsOpen(true)}
-              aria-label="Mở sidebar"
-              className="rounded-md p-1.5 text-[#1f1f1f] transition-all duration-200 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a1001f] focus-visible:ring-offset-2"
-            >
-              <Menu className="h-3 w-5" />
-            </button>
+            <div className="flex items-center gap-3">
+              <NotificationBell className="notification-bell-inline" />
+              <button
+                onClick={() => setIsOpen(true)}
+                aria-label="Mở sidebar"
+                className="rounded-md p-1.5 text-[#1f1f1f] transition-all duration-200 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a1001f] focus-visible:ring-offset-2"
+              >
+                <Menu className="h-3 w-5" />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -897,6 +916,11 @@ export function Sidebar() {
                         <Icon className="h-3.5 w-3.5" />
                       </div>
                       <span>{toTitleCase(item.label)}</span>
+                      {item.label === 'Thông báo' && unreadCount > 0 && (
+                        <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white leading-none">
+                          {unreadCount}
+                        </span>
+                      )}
                     </Link>
                   )}
                 </div>
@@ -907,12 +931,38 @@ export function Sidebar() {
           {/* User Info and Logout - Modern card design */}
           {user && (
             <div className="shrink-0 border-t border-gray-200 bg-gray-50 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+              {canSwitchToManagement && (
+                <Button
+                  asChild
+                  variant="mindx"
+                  size="sm"
+                  className="mb-2 w-full justify-start text-xs"
+                >
+                  <Link href="/admin/dashboard" onClick={closeSidebarOnMobile}>
+                    <Icon icon={BarChart3} size="sm" />
+                    Chuyển sang quản lý
+                  </Link>
+                </Button>
+              )}
+              {canSwitchToTeacher && (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="mb-2 w-full justify-start border-[#a1001f]/30 text-xs text-[#a1001f] hover:bg-[#a1001f]/5 hover:text-[#a1001f]"
+                >
+                  <Link href="/user/truyenthong" onClick={closeSidebarOnMobile}>
+                    <Icon icon={GraduationCap} size="sm" />
+                    Chuyển sang giáo viên
+                  </Link>
+                </Button>
+              )}
               <Link
-                href={user.isAdmin ? '/admin/profile' : '/user/profile'}
+                href={profileHref}
                 onClick={closeSidebarOnMobile}
                 className={cn(
                   'mb-2 block cursor-pointer rounded-lg border p-2 shadow-sm transition-all duration-300 hover:scale-[1.01] hover:border-[#a1001f]/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a1001f] focus-visible:ring-offset-2',
-                  pathname === '/user/profile' || pathname === '/admin/profile'
+                  pathname === profileHref
                     ? 'bg-[#a1001f]/5 border-[#a1001f]'
                     : 'bg-white border-gray-100 hover:border-[#a1001f]/30',
                 )}
