@@ -3,7 +3,6 @@ import { requireBearerSession } from '@/lib/datasource-api-auth';
 import { clientIpFromRequest, rateLimitOr429Async } from '@/lib/rate-limit-memory';
 import {
   createSupabaseS3Client,
-  getPublicObjectUrl,
   getSignedObjectUrl,
   isSupabaseS3Configured,
 } from '@/lib/supabase-s3';
@@ -95,13 +94,8 @@ export async function GET(request: NextRequest) {
 
     const forceProxy = searchParams.get('proxy') === '1';
     if (!forceProxy) {
-      const isPublicBucket = ANONYMOUS_READ_BUCKETS.has(bucket);
       const signedRedirectTtl = SIGNED_REDIRECT_BUCKET_TTLS.get(bucket);
       try {
-        if (isPublicBucket) {
-          return redirectToObjectUrl(getPublicObjectUrl(bucket, key), true);
-        }
-
         if (signedRedirectTtl) {
           const objectUrl = await getSignedObjectUrl(bucket, key, signedRedirectTtl);
           return redirectToObjectUrl(objectUrl, false);
