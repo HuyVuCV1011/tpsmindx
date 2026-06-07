@@ -18,6 +18,10 @@ interface Notification {
   created_at: string;
 }
 
+const NOTIFICATION_LIST_REFRESH_MS = 60_000;
+const NOTIFICATION_COUNT_REFRESH_MS = 60_000;
+const NOTIFICATION_DEDUPING_MS = 30_000;
+
 function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
@@ -91,14 +95,24 @@ export default function NotificationBell({ className = '' }: { className?: strin
   const { data: notificationsData, mutate: mutateNotifications } = useSWR(
     user?.email ? '/api/notifications?limit=15' : null,
     fetcher,
-    { refreshInterval: 30000 }
+    {
+      refreshInterval: NOTIFICATION_LIST_REFRESH_MS,
+      refreshWhenHidden: false,
+      refreshWhenOffline: false,
+      dedupingInterval: NOTIFICATION_DEDUPING_MS,
+    }
   );
 
   // Fetch unread count (shared SWR key with sidebar)
   const { data: unreadData, mutate: mutateUnread } = useSWR(
     user?.email ? '/api/notifications/unread-count' : null,
     fetcher,
-    { refreshInterval: 15000 }
+    {
+      refreshInterval: NOTIFICATION_COUNT_REFRESH_MS,
+      refreshWhenHidden: false,
+      refreshWhenOffline: false,
+      dedupingInterval: NOTIFICATION_DEDUPING_MS,
+    }
   );
 
   const notifications: Notification[] = notificationsData?.data || [];

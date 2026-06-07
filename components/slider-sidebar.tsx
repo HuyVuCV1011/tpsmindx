@@ -6,6 +6,7 @@ import useSWR from 'swr'
 import { normalizeStorageUrl } from '@/lib/storage-url'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
+const TRENDING_POSTS_REFRESH_MS = 120_000
 
 interface Post {
     id: string | number
@@ -31,7 +32,12 @@ export default function SliderSidebar() {
     const { data: posts = [] } = useSWR<Post[]>(
         '/api/truyenthong/posts?status=published&limit=5&sort=view_count',
         fetcher,
-        { refreshInterval: 60000 }
+        {
+            refreshInterval: TRENDING_POSTS_REFRESH_MS,
+            refreshWhenHidden: false,
+            refreshWhenOffline: false,
+            dedupingInterval: 30_000,
+        }
     )
 
     const trendingPosts = Array.isArray(posts) ? posts.slice(0, 5) : []

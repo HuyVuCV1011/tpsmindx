@@ -1,13 +1,21 @@
 import { requireCandidateSession } from '@/lib/candidate-session';
 import { requireBearerSession } from '@/lib/datasource-api-auth';
 import { clientIpFromRequest, rateLimitOr429Async } from '@/lib/rate-limit-memory';
-import { createSupabaseS3Client, isSupabaseS3Configured } from '@/lib/supabase-s3';
+import {
+  createSupabaseS3Client,
+  getPublicObjectUrl,
+  getSignedObjectUrl,
+  isSupabaseS3Configured,
+} from '@/lib/supabase-s3';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { NextRequest, NextResponse } from 'next/server';
 
 const ANONYMOUS_READ_BUCKETS = new Set([
   'mindx-posts-content',
   'mindx-thumbnails',
+]);
+const SIGNED_REDIRECT_BUCKET_TTLS = new Map<string, number>([
+  ['mindx-videos', 30 * 60],
 ]);
 
 function parseStorageUrl(rawUrl: string): { bucket: string; key: string } | null {
@@ -18,6 +26,18 @@ function parseStorageUrl(rawUrl: string): { bucket: string; key: string } | null
 
 function isSafeObjectKey(key: string): boolean {
   return Boolean(key) && !key.includes('..') && !key.startsWith('/');
+}
+
+function redirectToObjectUrl(url: string, isPublicBucket: boolean) {
+  const response = NextResponse.redirect(url, 307);
+  response.headers.set(
+    'Cache-Control',
+    isPublicBucket
+      ? 'public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400'
+      : 'private, no-store, max-age=0',
+  );
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  return response;
 }
 
 async function requireReadAccess(
@@ -73,6 +93,24 @@ export async function GET(request: NextRequest) {
     const denied = await requireReadAccess(request, bucket, key);
     if (denied) return denied;
 
+    const forceProxy = searchParams.get('proxy') === '1';
+    if (!forceProxy) {
+      const isPublicBucket = ANONYMOUS_READ_BUCKETS.has(bucket);
+      const signedRedirectTtl = SIGNED_REDIRECT_BUCKET_TTLS.get(bucket);
+      try {
+        if (isPublicBucket) {
+          return redirectToObjectUrl(getPublicObjectUrl(bucket, key), true);
+        }
+
+        if (signedRedirectTtl) {
+          const objectUrl = await getSignedObjectUrl(bucket, key, signedRedirectTtl);
+          return redirectToObjectUrl(objectUrl, false);
+        }
+      } catch (error: any) {
+        console.warn('[storage-proxy] direct redirect failed, fallback to proxy stream:', error?.message || error);
+      }
+    }
+
     const isVideo = /\.(mp4|webm|ogg|mov|avi|mkv)$/i.test(key);
     const rangeHeader = request.headers.get('range');
     const client = createSupabaseS3Client();
@@ -123,4 +161,3 @@ export async function GET(request: NextRequest) {
     return new NextResponse('Not found', { status: 404 });
   }
 }
-
