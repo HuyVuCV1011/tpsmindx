@@ -19,6 +19,9 @@ interface Notification {
   created_at: string;
 }
 
+const NOTIFICATION_COUNT_REFRESH_MS = 60_000;
+const NOTIFICATION_DEDUPING_MS = 30_000;
+
 // Maps categories to their display configurations
 const categoriesMap = {
   shift: {
@@ -224,7 +227,12 @@ export default function NotificationCenterPage() {
   const { data: unreadData, mutate: mutateUnread } = useSWR(
     user?.email ? '/api/notifications/unread-count' : null,
     fetcher,
-    { refreshInterval: 15000 }
+    {
+      refreshInterval: NOTIFICATION_COUNT_REFRESH_MS,
+      refreshWhenHidden: false,
+      refreshWhenOffline: false,
+      dedupingInterval: NOTIFICATION_DEDUPING_MS,
+    }
   );
 
   const notifications: Notification[] = notificationsData?.data || [];

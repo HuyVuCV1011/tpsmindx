@@ -33,6 +33,9 @@ import { authHeaders } from '@/lib/auth-headers'
 import useSWR from 'swr'
 import NotificationBell from '@/components/NotificationBell'
 
+const NOTIFICATION_COUNT_REFRESH_MS = 60_000
+const NOTIFICATION_DEDUPING_MS = 30_000
+
 export function Sidebar() {
   const { isOpen, setIsOpen, requestExpandLabels } = useSidebar()
   const [expandedMenus, setExpandedMenus] = useState<string[]>([])
@@ -55,7 +58,12 @@ export function Sidebar() {
   const { data: unreadData } = useSWR(
     user?.email ? '/api/notifications/unread-count' : null,
     fetcher,
-    { refreshInterval: 15000 }
+    {
+      refreshInterval: NOTIFICATION_COUNT_REFRESH_MS,
+      refreshWhenHidden: false,
+      refreshWhenOffline: false,
+      dedupingInterval: NOTIFICATION_DEDUPING_MS,
+    },
   )
   const unreadCount = unreadData?.count || 0
 
