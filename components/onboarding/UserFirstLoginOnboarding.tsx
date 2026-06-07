@@ -169,10 +169,31 @@ export default function UserFirstLoginOnboarding() {
   const [tourEnabled, setTourEnabled] = useState(false)
   const [sessionDismissed, setSessionDismissed] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
-  const [mascotPhase, setMascotPhase] = useState<'initial' | 'reading' | 'walking' | 'sitting'>('initial')
+  const [mascotPhase, setMascotPhase] = useState<
+    'initial' | 'reading' | 'walking' | 'sitting' | 'standingUp' | 'walkingAgain' | 'readingFinal'
+  >('initial')
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
   const [viewport, setViewport] = useState({ width: 1280, height: 720 })
   const tooltipRef = useRef<HTMLDivElement | null>(null)
+  const sittingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  const handleMascotAnimationComplete = () => {
+    setMascotPhase((current) => {
+      if (current === 'initial') return 'reading'
+      if (current === 'reading') return 'walking'
+      if (current === 'walking') return 'sitting'
+      if (current === 'sitting') {
+        if (sittingTimeoutRef.current) clearTimeout(sittingTimeoutRef.current)
+        sittingTimeoutRef.current = setTimeout(() => {
+          setMascotPhase('standingUp')
+        }, 2500)
+        return 'sitting'
+      }
+      if (current === 'standingUp') return 'walkingAgain'
+      if (current === 'walkingAgain') return 'readingFinal'
+      return current
+    })
+  }
 
   const step = TOUR_STEPS[stepIndex]
   const mascotFacing = useMemo<'left' | 'right'>(() => {
@@ -208,29 +229,20 @@ export default function UserFirstLoginOnboarding() {
   useEffect(() => {
     if (!tourEnabled) return
     
-    setMascotPhase('initial')
+    if (sittingTimeoutRef.current) {
+      clearTimeout(sittingTimeoutRef.current)
+    }
     
-    // 1. Start reading after a short delay (1.5s)
-    const readingTimer = setTimeout(() => {
-      setMascotPhase('reading')
-      
-      // 2. After reading finishes (approx 6.5s for 3 cycles), start walking
-      const walkingTimer = setTimeout(() => {
-        setMascotPhase('walking')
-        
-        // 3. After walking for a bit, sit down
-        const sittingTimer = setTimeout(() => {
-          setMascotPhase('sitting')
-        }, 2000)
-        
-        return () => clearTimeout(sittingTimer)
-      }, 6500)
-      
-      return () => clearTimeout(walkingTimer)
-    }, 1500)
-
-    return () => clearTimeout(readingTimer)
+    setMascotPhase('initial')
   }, [stepIndex, tourEnabled])
+
+  useEffect(() => {
+    return () => {
+      if (sittingTimeoutRef.current) {
+        clearTimeout(sittingTimeoutRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     const updateViewport = () =>
@@ -557,11 +569,13 @@ export default function UserFirstLoginOnboarding() {
             >
               <Mascot
                 animation={
-                  mascotPhase === 'reading' ? 'standAndRead' : 
-                  mascotPhase === 'walking' ? 'walk' :
+                  mascotPhase === 'reading' || mascotPhase === 'readingFinal' ? 'standAndRead' : 
+                  mascotPhase === 'walking' || mascotPhase === 'walkingAgain' ? 'walk' :
                   mascotPhase === 'sitting' ? 'walkToSit' : 
+                  mascotPhase === 'standingUp' ? 'sitToStand' : 
                   (step.mascotAction as MascotAnimation)
                 }
+                onComplete={handleMascotAnimationComplete}
                 className="w-full h-full"
                 style={{
                   transform: 'scaleX(1)',

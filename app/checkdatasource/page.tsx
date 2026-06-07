@@ -175,6 +175,43 @@ function FeedbackImageThumb({ file, onRemove }: { file: File; onRemove: () => vo
   );
 }
 
+/**
+ * Kiểm tra và import điểm đào tạo nâng cao từ Google Sheet nếu chưa có.
+ * Hàm này idempotent — import API sẽ skip nếu đã có điểm rồi.
+ * Tách ra ngoài component để dùng được ở cả 2 nhánh: redirect thẳng và confirm flow.
+ */
+async function triggerScoreImportIfNeeded(teacherCode: string, token: string | null): Promise<void> {
+  const importRes = await fetch("/api/internal/import-teacher-scores", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ teacherCode }),
+  });
+  const importData = await importRes.json().catch(() => ({})) as {
+    success?: boolean;
+    alreadyImported?: boolean;
+    imported?: boolean;
+    notInSheet?: boolean;
+    noValidScores?: boolean;
+    count?: number;
+    error?: string;
+  };
+
+  if (importData.success && importData.imported) {
+    console.info("[checkdatasource] Đã import điểm đào tạo nâng cao:", teacherCode, `(${importData.count} bài)`);
+  } else if (importData.alreadyImported) {
+    console.info("[checkdatasource] Điểm đã có trong hệ thống, bỏ qua:", teacherCode);
+  } else if (importData.notInSheet) {
+    console.info("[checkdatasource] Giáo viên chưa có trong sheet điểm:", teacherCode);
+  } else if (importData.noValidScores) {
+    console.info("[checkdatasource] Giáo viên có trong sheet nhưng chưa có điểm:", teacherCode);
+  } else if (!importData.success) {
+    console.warn("[checkdatasource] Import điểm thất bại:", importData.error);
+  }
+}
+
 function CheckDataSourceContent() {
   const { user, logout, token } = useAuth();
   const router = useRouter();
@@ -276,7 +313,21 @@ function CheckDataSourceContent() {
         if (dbResult.status === "fulfilled" && dbResult.value.ok) {
           dbData = await dbResult.value.json().catch(() => null);
           if (dbData?.success && dbData?.teacher) {
-            // Đã có hồ sơ trong bảng teachers → không cần xem màn check nữa, vào Truyền thông luôn
+            // Đã có hồ sơ trong bảng teachers — kiểm tra thêm điểm đào tạo nâng cao.
+            // Nếu giáo viên chưa có điểm thì trigger import trước khi redirect,
+            // tránh trường hợp HR nhập tay teachers nhưng điểm chưa được sync.
+            const teacherCode = (
+              dbData.teacher?.code ||
+              dbData.teacher?.["Code"] ||
+              user.email.split("@")[0]
+            ).toLowerCase().trim();
+
+            try {
+              await triggerScoreImportIfNeeded(teacherCode, token);
+            } catch {
+              // Non-fatal — không block user vào app
+            }
+
             try {
               localStorage.setItem("tps_profile_check_done_email", userEmail);
             } catch {
@@ -350,35 +401,14 @@ function CheckDataSourceContent() {
       // Mark profile as done so AppLayout guard allows /user/* access
       localStorage.setItem("tps_profile_check_done_email", userEmail);
 
-      // ── Import advanced training scores from Google Sheet (first-login only) ──
-      // Chỉ import nếu đây là giáo viên đăng nhập vào hệ thống lần đầu (isNewTeacher = true)
+      // ── Import điểm đào tạo nâng cao từ Google Sheet (nếu chưa có) ──────────
+      // Dùng isNewTeacher từ confirm API (đã được tính dựa trên trạng thái điểm thực tế,
+      // không phải chỉ dựa trên INSERT mới vào teachers).
+      // Chạy fire-and-forget — không block navigation vào app.
       if (data.isNewTeacher) {
-        try {
-          const importRes = await fetch("/api/internal/import-teacher-scores", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...authHeaders(token),
-            },
-            body: JSON.stringify({ teacherCode }),
-          });
-          const importData = (await importRes.json().catch(() => ({}))) as {
-            success?: boolean;
-            alreadyImported?: boolean;
-            imported?: boolean;
-            error?: string;
-          };
-          if (importData.success && importData.imported) {
-            console.info("[checkdatasource] Advanced training scores imported for", teacherCode);
-          } else if (importData.alreadyImported) {
-            console.info("[checkdatasource] Scores already imported for", teacherCode);
-          } else if (!importData.success) {
-            console.warn("[checkdatasource] Score import returned failure:", importData.error);
-          }
-        } catch (importErr) {
-          // Non-fatal – log and continue
-          console.warn("[checkdatasource] Could not import advanced training scores:", importErr);
-        }
+        triggerScoreImportIfNeeded(teacherCode, token).catch((importErr) => {
+          console.warn("[checkdatasource] Lỗi khi import điểm:", importErr);
+        });
       }
 
     } catch (error: unknown) {
