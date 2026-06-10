@@ -93,6 +93,49 @@ const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 3)
   throw new Error(`Lỗi đường truyền hoặc máy chủ quá tải. Chi tiết: ${lastError}`);
 };
 
+const fetchDirectStorageWithRetry = async (
+  url: string,
+  options: RequestInit,
+  maxRetries = 3
+): Promise<Response> => {
+  let lastError = "";
+
+  for (let i = 0; i < maxRetries; i++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (response.ok) return response;
+
+      const errorText = await response.text().catch(() => "");
+      lastError = `Status ${response.status}: ${errorText}`;
+      if (response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status)) {
+        throw new Error(lastError);
+      }
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      lastError = err?.name === "AbortError"
+        ? "Kết nối storage bị timeout"
+        : err?.message || String(err);
+      if (err?.message?.startsWith("Status ")) throw err;
+    }
+
+    if (i < maxRetries - 1) await new Promise((r) => setTimeout(r, 3000));
+  }
+
+  throw new Error(lastError || "Không thể upload trực tiếp lên storage");
+};
+
+function makeStorageProxyUrl(bucket: string, key: string): string {
+  return `/api/storage-image?bucket=${encodeURIComponent(bucket)}&key=${encodeURIComponent(key)}`;
+}
+
 /**
  * Khởi tạo multipart upload, trả về { uploadId, key, bucket }
  */
@@ -107,6 +150,84 @@ const initMultipartUpload = async (filename: string, contentType: string) => {
   return data as { uploadId: string; key: string; bucket: string };
 };
 
+const uploadSingleVideoDirect = async (file: File): Promise<string> => {
+  const signRes = await fetchWithRetry("/api/cloudinary-signature", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      filename: file.name,
+      contentType: file.type || "video/mp4",
+    }),
+  }, 3);
+  const signed = await signRes.json();
+  if (!signed?.presignedUrl || !signed?.bucket || !signed?.key) {
+    throw new Error(signed?.error || "Không thể tạo link upload trực tiếp");
+  }
+
+  await fetchDirectStorageWithRetry(signed.presignedUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": file.type || "video/mp4",
+    },
+    body: file,
+  }, 3);
+
+  return makeStorageProxyUrl(signed.bucket, signed.key);
+};
+
+const uploadSingleVideoWithFallback = async (file: File): Promise<string> => {
+  try {
+    return await uploadSingleVideoDirect(file);
+  } catch (error: any) {
+    console.warn("Direct video upload failed, fallback to server upload:", error?.message || error);
+  }
+
+  const formData = new FormData();
+  formData.append("video", file);
+
+  const uploadRes = await fetchWithRetry("/api/upload-video", { method: "POST", body: formData }, 5);
+  const uploadData = await uploadRes.json();
+
+  if (!uploadData.success) {
+    throw new Error(uploadData.error || "Upload thất bại");
+  }
+
+  return uploadData.url as string;
+};
+
+const uploadPartDirect = async (
+  key: string,
+  uploadId: string,
+  partNumber: number,
+  blob: Blob
+): Promise<{ ETag: string; PartNumber: number }> => {
+  const signRes = await fetchWithRetry("/api/upload-multipart-part-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      key,
+      uploadId,
+      partNumber,
+      size: blob.size,
+    }),
+  }, 3);
+  const signed = await signRes.json();
+  if (!signed?.success || !signed?.uploadUrl) {
+    throw new Error(signed?.error || `Không thể tạo link upload part ${partNumber}`);
+  }
+
+  const uploadResponse = await fetchDirectStorageWithRetry(signed.uploadUrl, {
+    method: "PUT",
+    body: blob,
+  }, 3);
+  const etag = uploadResponse.headers.get("ETag") || uploadResponse.headers.get("etag");
+  if (!etag) {
+    throw new Error("Storage không trả về ETag cho part upload");
+  }
+
+  return { ETag: etag.trim(), PartNumber: partNumber };
+};
+
 /**
  * Upload một part, trả về { ETag, PartNumber }
  */
@@ -117,6 +238,12 @@ const uploadPart = async (
   partNumber: number,
   blob: Blob
 ): Promise<{ ETag: string; PartNumber: number }> => {
+  try {
+    return await uploadPartDirect(key, uploadId, partNumber, blob);
+  } catch (error: any) {
+    console.warn(`Direct multipart upload failed for part ${partNumber}, fallback to server upload:`, error?.message || error);
+  }
+
   const formData = new FormData();
   formData.append("bucket", bucket);
   formData.append("key", key);
@@ -277,15 +404,7 @@ export const UploadVideoProvider = ({ children }: { children: React.ReactNode })
         // ── SINGLE UPLOAD (file ≤ 50MB) ─────────────────────────────────────
         setUploadState((prev) => ({ ...prev, statusText: "Đang tải lên video...", progress: 30 }));
 
-        const formData = new FormData();
-        formData.append("video", file);
-
-        const uploadRes = await fetchWithRetry("/api/upload-video", { method: "POST", body: formData }, 5);
-        const uploadData = await uploadRes.json();
-
-        if (!uploadData.success) {
-          throw new Error(uploadData.error || "Upload thất bại");
-        }
+        const videoUrl = await uploadSingleVideoWithFallback(file);
 
         setUploadState((prev) => ({ ...prev, statusText: "Đang lưu vào kho dữ liệu...", progress: 90 }));
 
@@ -293,7 +412,7 @@ export const UploadVideoProvider = ({ children }: { children: React.ReactNode })
 
         const videoData = await saveVideoToDB({
           title: file.name.replace(/\.[^/.]+$/, ""),
-          video_link: uploadData.url,
+          video_link: videoUrl,
           saveEndpoint: options.saveEndpoint,
           status: options.status,
           duration_seconds: durationSec,

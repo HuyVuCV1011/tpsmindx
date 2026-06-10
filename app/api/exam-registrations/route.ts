@@ -10,6 +10,14 @@
  */
 
 import pool from '@/lib/db';
+import { requireSameOriginMutation } from '@/lib/api-security';
+import { requireBearerAdminOrSuperMutation } from '@/lib/auth-server';
+import {
+  rejectIfChuyenSauResultNotOwned,
+  rejectIfDatasourceLookupForbidden,
+  rejectIfEmailNotSelf,
+  requireBearerSession,
+} from '@/lib/datasource-api-auth';
 import { eventScheduleTsInstantExpr } from '@/lib/event-schedule-time';
 import { insertExamRegistration } from '@/lib/exam-registration-insert';
 import { NextRequest, NextResponse } from 'next/server';
@@ -98,6 +106,31 @@ export async function GET(request: NextRequest) {
 
     const conditions: string[] = [];
     const values: unknown[] = [];
+    const auth = await requireBearerSession(request);
+    if (!auth.ok) return auth.response;
+    const isAdmin = Boolean(auth.resolvedAccess.isAdmin);
+
+    if (resultId) {
+      const denied = await rejectIfChuyenSauResultNotOwned(auth.sessionEmail, isAdmin, resultId);
+      if (denied) return denied;
+    }
+    if (email) {
+      const denied = rejectIfEmailNotSelf(auth.sessionEmail, isAdmin, email);
+      if (denied) return denied;
+    }
+    if (teacherCode) {
+      const denied = await rejectIfDatasourceLookupForbidden(
+        auth.sessionEmail,
+        isAdmin,
+        email || '',
+        teacherCode,
+      );
+      if (denied) return denied;
+    }
+    if (!isAdmin && !resultId && !email && !teacherCode) {
+      conditions.push(`LOWER(TRIM(COALESCE(r.dia_chi_email, ''))) = LOWER(TRIM($${values.length + 1}))`);
+      values.push(auth.sessionEmail);
+    }
 
     if (resultId) {
       conditions.push(`r.id = $${values.length + 1}`);
@@ -364,10 +397,42 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const originDenied = requireSameOriginMutation(request);
+    if (originDenied) return originDenied;
+
+    const auth = await requireBearerSession(request);
+    if (!auth.ok) return auth.response;
+    const isAdmin = Boolean(auth.resolvedAccess.isAdmin);
+
     const body = await request.json();
     console.log('[exam-registrations POST] Request body:', JSON.stringify(body, null, 2));
-    
-    const result = await insertExamRegistration(pool, body as Record<string, unknown>);
+
+    const targetEmail = String(body?.dia_chi_email || body?.email || '').trim();
+    const teacherCode = String(body?.ma_giao_vien || body?.teacher_code || '').trim();
+
+    // Kiểm tra: user chỉ được đăng ký cho chính mình (trừ admin)
+    if (targetEmail) {
+      const denied = rejectIfEmailNotSelf(auth.sessionEmail, isAdmin, targetEmail);
+      if (denied) return denied;
+    }
+    // Kiểm tra: không được tra cứu dữ liệu teacher_code của người khác
+    if (teacherCode) {
+      const denied = await rejectIfDatasourceLookupForbidden(
+        auth.sessionEmail,
+        isAdmin,
+        targetEmail,
+        teacherCode,
+      );
+      if (denied) return denied;
+    }
+
+    // Tự điền email từ session nếu body không cung cấp
+    const registrationBody = {
+      ...body,
+      ...(targetEmail ? {} : { dia_chi_email: auth.sessionEmail }),
+    } as Record<string, unknown>;
+
+    const result = await insertExamRegistration(pool, registrationBody);
     if (!result.ok) {
       console.error('[exam-registrations POST] Insert failed:', result.error);
       return NextResponse.json(
@@ -387,9 +452,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[exam-registrations POST] Unexpected error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ 
-      success: false, 
-      error: `Invalid request body: ${errorMessage}` 
+    return NextResponse.json({
+      success: false,
+      error: `Invalid request body: ${errorMessage}`,
     }, { status: 400 });
   }
 }
@@ -398,8 +463,11 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const authGate = await requireBearerAdminOrSuperMutation(request);
+    if (!authGate.ok) return authGate.response;
+
     const body = await request.json();
-    const { result_id, status, set_code, notes } = body;
+    const { result_id } = body;
 
     if (!result_id) {
       return NextResponse.json({ success: false, error: 'result_id is required' }, { status: 400 });
@@ -460,6 +528,12 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const originDenied = requireSameOriginMutation(request);
+    if (originDenied) return originDenied;
+
+    const auth = await requireBearerSession(request);
+    if (!auth.ok) return auth.response;
+
     const { searchParams } = new URL(request.url);
     const resultId = searchParams.get('result_id');
 
@@ -468,6 +542,13 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Chỉ cho xóa nếu chưa thi (xu_ly_diem = 'chờ giải trình' = chưa nộp bài)
+    const denied = await rejectIfChuyenSauResultNotOwned(
+      auth.sessionEmail,
+      Boolean(auth.resolvedAccess.isAdmin),
+      resultId,
+    );
+    if (denied) return denied;
+
     const result = await pool.query(
       `DELETE FROM chuyen_sau_results
        WHERE id = $1 AND xu_ly_diem = 'chờ giải trình'

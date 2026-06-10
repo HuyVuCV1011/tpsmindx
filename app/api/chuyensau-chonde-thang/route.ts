@@ -1,7 +1,9 @@
 import pool from '@/lib/db';
+import { requireBearerAdminOrSuperMutation } from '@/lib/auth-server';
 import { NextRequest, NextResponse } from 'next/server';
+import { createNotificationForEveryone } from '@/lib/notification-service';
 
-// ─── GET: Lấy bộ đề chọn mặc định cho tháng ────────────────────────────────────────
+// â”€â”€â”€ GET: Láº¥y bá»™ Ä‘á» chá»n máº·c Ä‘á»‹nh cho thÃ¡ng â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,7 +13,7 @@ export async function GET(request: NextRequest) {
     const month = parseInt(searchParams.get('month') || '0', 10);
 
     if (!subjectId || !year || !month) {
-      return NextResponse.json({ success: false, error: 'Bắt buộc: subject_id, year, month' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Báº¯t buá»™c: subject_id, year, month' }, { status: 400 });
     }
 
     const res = await pool.query(
@@ -42,15 +44,18 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ─── POST: Chọn thủ công bộ đề (ghi đè) ──────────────────────────────────────────
+// â”€â”€â”€ POST: Chá»n thá»§ cÃ´ng bá»™ Ä‘á» (ghi Ä‘Ã¨) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function POST(request: NextRequest) {
   try {
+    const authGate = await requireBearerAdminOrSuperMutation(request);
+    if (!authGate.ok) return authGate.response;
+
     const body = await request.json();
     const { subject_id, year, month, selected_set_id } = body;
 
     if (!subject_id || !year || !month || !selected_set_id) {
-      return NextResponse.json({ success: false, error: 'Thiếu thông tin bắt buộc' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Thiáº¿u thÃ´ng tin báº¯t buá»™c' }, { status: 400 });
     }
 
     const res = await pool.query(
@@ -66,6 +71,22 @@ export async function POST(request: NextRequest) {
       [parseInt(subject_id, 10), parseInt(year, 10), parseInt(month, 10), parseInt(selected_set_id, 10)]
     );
 
+    // Notify everyone
+    try {
+      const subjectRes = await pool.query('SELECT ten_mon FROM chuyen_sau_monhoc WHERE id = $1', [parseInt(subject_id, 10)]);
+      const subjectName = subjectRes.rows[0]?.ten_mon || '';
+      createNotificationForEveryone({
+        title: `Mở đề kiểm tra chuyên sâu`,
+        content: `Đã mở đề kiểm tra chuyên sâu môn "${subjectName}" cho tháng ${month}/${year}. Vui lòng đăng ký tham gia.`,
+        type: 'exam',
+        link: '/user/assignments',
+      }).catch((err) =>
+        console.error('Failed to notify everyone of monthly exam set open:', err)
+      );
+    } catch (err) {
+      console.error('Error fetching subject name for monthly set selection:', err);
+    }
+
     return NextResponse.json({ success: true, data: res.rows[0] });
   } catch (error) {
     console.error('Error saving manual selection:', error);
@@ -73,18 +94,21 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ─── PATCH: Chọn ngẫu nhiên bộ đề ────────────────────────────────────────────────
+// â”€â”€â”€ PATCH: Chá»n ngáº«u nhiÃªn bá»™ Ä‘á» â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function PATCH(request: NextRequest) {
   try {
+    const authGate = await requireBearerAdminOrSuperMutation(request);
+    if (!authGate.ok) return authGate.response;
+
     const body = await request.json();
     const { subject_id, year, month } = body;
 
     if (!subject_id || !year || !month) {
-      return NextResponse.json({ success: false, error: 'Thiếu thông tin bắt buộc' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Thiáº¿u thÃ´ng tin báº¯t buá»™c' }, { status: 400 });
     }
 
-    // Lấy các bộ đề hợp lệ của môn
+    // Láº¥y cÃ¡c bá»™ Ä‘á» há»£p lá»‡ cá»§a mÃ´n
     const validSets = await pool.query(
       `SELECT
          bd.id, bd.ma_de, bd.ten_de
@@ -99,10 +123,10 @@ export async function PATCH(request: NextRequest) {
     );
 
     if (validSets.rows.length === 0) {
-      return NextResponse.json({ success: false, error: 'Không có bộ đề hợp lệ để chọn ngẫu nhiên.' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'KhÃ´ng cÃ³ bá»™ Ä‘á» há»£p lá»‡ Ä‘á»ƒ chá»n ngáº«u nhiÃªn.' }, { status: 400 });
     }
 
-    // Chọn random 1 bộ
+    // Chá»n random 1 bá»™
     const randomIndex = Math.floor(Math.random() * validSets.rows.length);
     const chosenSet = validSets.rows[randomIndex];
 
@@ -119,6 +143,22 @@ export async function PATCH(request: NextRequest) {
       [parseInt(subject_id, 10), parseInt(year, 10), parseInt(month, 10), chosenSet.id]
     );
 
+    // Notify everyone
+    try {
+      const subjectRes = await pool.query('SELECT ten_mon FROM chuyen_sau_monhoc WHERE id = $1', [parseInt(subject_id, 10)]);
+      const subjectName = subjectRes.rows[0]?.ten_mon || '';
+      createNotificationForEveryone({
+        title: `Mở đề kiểm tra chuyên sâu`,
+        content: `Đã mở đề kiểm tra chuyên sâu môn "${subjectName}" cho tháng ${month}/${year}. Vui lòng đăng ký tham gia.`,
+        type: 'exam',
+        link: '/user/assignments',
+      }).catch((err) =>
+        console.error('Failed to notify everyone of monthly exam set open:', err)
+      );
+    } catch (err) {
+      console.error('Error fetching subject name for monthly set selection:', err);
+    }
+
     return NextResponse.json({ success: true, data: { ...res.rows[0], chosenSet } });
   } catch (error) {
     console.error('Error randomizing selection:', error);
@@ -126,17 +166,20 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// ─── DELETE: Xóa lựa chọn của tháng ──────────────────────────────────────────────
+// â”€â”€â”€ DELETE: XÃ³a lá»±a chá»n cá»§a thÃ¡ng â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function DELETE(request: NextRequest) {
   try {
+    const authGate = await requireBearerAdminOrSuperMutation(request);
+    if (!authGate.ok) return authGate.response;
+
     const { searchParams } = new URL(request.url);
     const subjectId = parseInt(searchParams.get('subject_id') || '0', 10);
     const year = parseInt(searchParams.get('year') || '0', 10);
     const month = parseInt(searchParams.get('month') || '0', 10);
 
     if (!subjectId || !year || !month) {
-      return NextResponse.json({ success: false, error: 'Bắt buộc: subject_id, year, month' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Báº¯t buá»™c: subject_id, year, month' }, { status: 400 });
     }
 
     await pool.query(
@@ -145,7 +188,7 @@ export async function DELETE(request: NextRequest) {
       [subjectId, year, month]
     );
 
-    return NextResponse.json({ success: true, message: 'Đã xóa lựa chọn' });
+    return NextResponse.json({ success: true, message: 'ÄÃ£ xÃ³a lá»±a chá»n' });
   } catch (error) {
     console.error('Error deleting monthly selection:', error);
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });

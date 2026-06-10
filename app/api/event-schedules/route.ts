@@ -1,13 +1,15 @@
-﻿import { withApiProtection } from '@/lib/api-protection';
+import { withApiProtection } from '@/lib/api-protection';
 import {
   EVENT_SCHEDULE_WALL_IANA,
   eventScheduleTsAsTimestamptz,
   parseToVnWallStorage,
   vnWallStorageSqlToInstantMs,
 } from '@/lib/event-schedule-time';
+import { requireBearerAdminOrSuperMutation } from '@/lib/auth-server';
 import pool from '@/lib/db';
 import { isDegradedDatabaseQueryError } from '@/lib/db-unavailable';
 import { NextRequest, NextResponse } from 'next/server';
+import { createNotificationForEveryone } from '@/lib/notification-service';
 
 const EVENT_TYPES = [
   'dang_ky',
@@ -386,6 +388,9 @@ export const GET = withApiProtection(async (request: NextRequest) => {
 
 export const POST = withApiProtection(async (request: NextRequest) => {
   try {
+    const authGate = await requireBearerAdminOrSuperMutation(request);
+    if (!authGate.ok) return authGate.response;
+
     const body = await request.json();
     const columns = await getEventScheduleColumns();
 
@@ -506,6 +511,30 @@ export const POST = withApiProtection(async (request: NextRequest) => {
       );
     }
 
+    // Notify everyone for exam/registration/advanced_training_release events
+    if (loai_su_kien === 'dang_ky' || loai_su_kien === 'registration') {
+      createNotificationForEveryone({
+        title: `Mở đăng ký kiểm tra chuyên sâu`,
+        content: `Sự kiện đăng ký "${ten}" đã được mở. Vui lòng đăng ký tham gia.`,
+        type: 'exam',
+        link: '/user/assignments',
+      }).catch((err) => console.error('Failed to notify everyone of registration event open:', err));
+    } else if (loai_su_kien === 'thi' || loai_su_kien === 'exam') {
+      createNotificationForEveryone({
+        title: `Lịch thi chuyên sâu mới`,
+        content: `Đợt thi chuyên sâu "${ten}" đã được lên lịch. Hãy xem thông tin chi tiết.`,
+        type: 'exam',
+        link: '/user/assignments',
+      }).catch((err) => console.error('Failed to notify everyone of exam event open:', err));
+    } else if (loai_su_kien === 'advanced_training_release') {
+      createNotificationForEveryone({
+        title: `Tài liệu đào tạo nâng cao mới`,
+        content: `Đã mở tài liệu đào tạo nâng cao mới: "${ten}". Hãy bắt đầu học tập.`,
+        type: 'training',
+        link: '/user/dao-tao-nang-cao',
+      }).catch((err) => console.error('Failed to notify everyone of advanced training release:', err));
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -525,6 +554,9 @@ export const POST = withApiProtection(async (request: NextRequest) => {
 
 export const PUT = withApiProtection(async (request: NextRequest) => {
   try {
+    const authGate = await requireBearerAdminOrSuperMutation(request);
+    if (!authGate.ok) return authGate.response;
+
     const body = await request.json();
     const columns = await getEventScheduleColumns();
     const { id } = body;
@@ -537,7 +569,7 @@ export const PUT = withApiProtection(async (request: NextRequest) => {
     }
 
     const currentEventResult = await pool.query(
-      `SELECT 1 FROM event_schedules WHERE id = $1 LIMIT 1`,
+      `SELECT ten, loai_su_kien, trang_thai FROM event_schedules WHERE id = $1 LIMIT 1`,
       [String(id)],
     );
 
@@ -677,6 +709,36 @@ export const PUT = withApiProtection(async (request: NextRequest) => {
       );
     }
 
+    const oldEvent = currentEventResult.rows[0];
+    const ten_val = ten || oldEvent.ten;
+    const loai_su_kien_val = loai_su_kien || oldEvent.loai_su_kien;
+    const isNewScheduled = trang_thai === 'scheduled' && oldEvent.trang_thai !== 'scheduled';
+
+    if (isNewScheduled) {
+      if (loai_su_kien_val === 'dang_ky' || loai_su_kien_val === 'registration') {
+        createNotificationForEveryone({
+          title: `Mở đăng ký kiểm tra chuyên sâu`,
+          content: `Sự kiện đăng ký "${ten_val || ''}" đã được mở. Vui lòng đăng ký tham gia.`,
+          type: 'exam',
+          link: '/user/assignments',
+        }).catch((err) => console.error('Failed to notify everyone of registration event open:', err));
+      } else if (loai_su_kien_val === 'thi' || loai_su_kien_val === 'exam') {
+        createNotificationForEveryone({
+          title: `Lịch thi chuyên sâu mới`,
+          content: `Đợt thi chuyên sâu "${ten_val || ''}" đã được lên lịch. Hãy xem thông tin chi tiết.`,
+          type: 'exam',
+          link: '/user/assignments',
+        }).catch((err) => console.error('Failed to notify everyone of exam event open:', err));
+      } else if (loai_su_kien_val === 'advanced_training_release') {
+        createNotificationForEveryone({
+          title: `Tài liệu đào tạo nâng cao mới`,
+          content: `Đã mở tài liệu đào tạo nâng cao mới: "${ten_val || ''}". Hãy bắt đầu học tập.`,
+          type: 'training',
+          link: '/user/dao-tao-nang-cao',
+        }).catch((err) => console.error('Failed to notify everyone of advanced training release:', err));
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: serializeEventScheduleRow(merged),
@@ -693,6 +755,9 @@ export const PUT = withApiProtection(async (request: NextRequest) => {
 
 export const DELETE = withApiProtection(async (request: NextRequest) => {
   try {
+    const authGate = await requireBearerAdminOrSuperMutation(request);
+    if (!authGate.ok) return authGate.response;
+
     const body = await request.json();
     const { id } = body;
 

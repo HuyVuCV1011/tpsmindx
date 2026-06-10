@@ -1,4 +1,8 @@
 import { withApiProtection } from '@/lib/api-protection';
+import {
+  rejectIfDatasourceLookupForbidden,
+  requireBearerSession,
+} from '@/lib/datasource-api-auth';
 import pool from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -13,6 +17,9 @@ const COMPLETION_THRESHOLD  = 0.90; // phải xem ít nhất 90% mới được 
 
 export const POST = withApiProtection(async (request: NextRequest) => {
   try {
+    const auth = await requireBearerSession(request);
+    if (!auth.ok) return auth.response;
+
     const body = await request.json();
     const { videoId, timeSpent, isCompleted, totalDuration } = body;
     // Normalize teacher_code: lowercase + trim để tránh case mismatch với các API khác
@@ -21,6 +28,14 @@ export const POST = withApiProtection(async (request: NextRequest) => {
     if (!teacherCode || !videoId) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
+
+    const denied = await rejectIfDatasourceLookupForbidden(
+      auth.sessionEmail,
+      Boolean(auth.resolvedAccess.isAdmin),
+      '',
+      teacherCode,
+    );
+    if (denied) return denied;
 
     const client = await pool.connect();
     try {
