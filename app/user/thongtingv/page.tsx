@@ -1651,20 +1651,6 @@ export default function Page1() {
               className="border border-gray-200 rounded-xl p-3 sm:p-4 animate-fadeIn bg-white"
               style={{ animationDelay: '0.2s' }}
             >
-              {/* Debug button - remove in production */}
-              <div className="mb-3 flex justify-end">
-                <button
-                  onClick={async () => {
-                    console.log('🔄 Manual refresh triggered')
-                    console.log('ScoresUrl:', scoresUrl)
-                    await scoresMutate()
-                  }}
-                  className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                >
-                  🔄 Refresh Scores
-                </button>
-              </div>
-              
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 items-end">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
