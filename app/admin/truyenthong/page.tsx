@@ -67,6 +67,7 @@ export default function TruyenthongDashboardPage() {
     const [filterStatus, setFilterStatus] = useState<'all' | 'draft' | 'published' | 'hidden'>('all')
 
     const queryParams = new URLSearchParams()
+    queryParams.set('include', 'comment_counts')
     if (filterStatus !== 'all') queryParams.append('status', filterStatus)
     if (searchTerm) queryParams.append('search', searchTerm)
 

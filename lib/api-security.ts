@@ -44,6 +44,7 @@
  * - `ALLOWED_API_EXTRA_ORIGINS`: URL bổ sung nếu app chạy trên nhiều domain
  */
 
+import { OFFICIAL_APP_ORIGINS } from '@/lib/allowed-app-origins';
 import { NextRequest, NextResponse } from 'next/server';
 
 /** Các HTTP method tạo ra side-effect (thay đổi dữ liệu). */
@@ -60,6 +61,7 @@ function normalizeOrigin(value: string): string {
  */
 function parseConfiguredOrigins(): string[] {
   const rawValues = [
+    ...OFFICIAL_APP_ORIGINS,
     process.env.NEXT_PUBLIC_APP_URL,
     process.env.ALLOWED_API_EXTRA_ORIGINS,
   ].filter(Boolean);

@@ -91,25 +91,61 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type');
     const status = searchParams.get('status');
     const search = searchParams.get('search');
+    const sort = searchParams.get('sort');
+    const requestedLimit = Number.parseInt(searchParams.get('limit') || '', 10);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), 100)
+      : null;
     const sessionToken = request.cookies.get(TPS_SESSION_COOKIE)?.value;
     const session = sessionToken
       ? await verifySessionCookieValue(sessionToken)
       : null;
     const canSeeDrafts = session?.canAdminPortal === true;
     const effectiveStatus = canSeeDrafts ? status : 'published';
+    const includeCommentCounts =
+      canSeeDrafts && searchParams.get('include') === 'comment_counts';
 
+    // List views never render the full HTML body. Excluding `content` keeps the
+    // response small as the number and size of posts grow.
     let queryText = `
-SELECT c.*,
+SELECT
+  c.id,
+  c.slug,
+  c.title,
+  c.description,
+  c.featured_image,
+  c.banner_image,
+  c.thumbnail_position,
+  c.post_type,
+  c.audience,
+  c.status,
+  c.published_at,
+  c.view_count,
+  c.like_count,
+  c.created_at,
+  c.updated_at`;
+
+    if (includeCommentCounts) {
+      queryText += `,
   COALESCE(tt.comment_count, 0)::int AS comment_count,
-  COALESCE(tt.hidden_comment_count, 0)::int AS hidden_comment_count
-FROM communications c
+  COALESCE(tt.hidden_comment_count, 0)::int AS hidden_comment_count`;
+    }
+
+    queryText += `
+FROM communications c`;
+
+    if (includeCommentCounts) {
+      queryText += `
 LEFT JOIN (
   SELECT post_slug,
     COUNT(*) FILTER (WHERE hidden IS NOT TRUE)::int AS comment_count,
     COUNT(*) FILTER (WHERE hidden IS TRUE)::int AS hidden_comment_count
   FROM truyenthong_comments
   GROUP BY post_slug
-) tt ON tt.post_slug = c.slug
+) tt ON tt.post_slug = c.slug`;
+    }
+
+    queryText += `
 WHERE 1=1`;
     const queryParams: any[] = [];
     let paramIndex = 1;
@@ -132,13 +168,27 @@ WHERE 1=1`;
       paramIndex++;
     }
 
-    queryText += ' ORDER BY c.created_at DESC';
+    const sortColumns: Record<string, string> = {
+      view_count: 'c.view_count',
+      published_at: 'c.published_at',
+      created_at: 'c.created_at',
+    };
+    const sortColumn = sortColumns[sort || 'created_at'] || sortColumns.created_at;
+    queryText += ` ORDER BY ${sortColumn} DESC, c.id DESC`;
+
+    if (limit !== null) {
+      queryText += ` LIMIT $${paramIndex}`;
+      queryParams.push(limit);
+    }
 
     const client = await pool.connect();
     try {
       const result = await client.query(queryText, queryParams);
+      const cacheControl = includeCommentCounts || effectiveStatus !== 'published'
+        ? 'private, no-store'
+        : 'public, s-maxage=60, stale-while-revalidate=300';
       return NextResponse.json(result.rows, {
-        headers: { 'Cache-Control': 'public, s-maxage=15, stale-while-revalidate=59' },
+        headers: { 'Cache-Control': cacheControl },
       });
     } finally {
       client.release();

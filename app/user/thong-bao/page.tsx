@@ -19,8 +19,8 @@ interface Notification {
   created_at: string;
 }
 
-const NOTIFICATION_COUNT_REFRESH_MS = 60_000;
-const NOTIFICATION_DEDUPING_MS = 30_000;
+const NOTIFICATION_COUNT_REFRESH_MS = 180_000;
+const NOTIFICATION_DEDUPING_MS = 60_000;
 
 // Maps categories to their display configurations
 const categoriesMap = {
@@ -231,6 +231,7 @@ export default function NotificationCenterPage() {
       refreshInterval: NOTIFICATION_COUNT_REFRESH_MS,
       refreshWhenHidden: false,
       refreshWhenOffline: false,
+      revalidateOnFocus: true,
       dedupingInterval: NOTIFICATION_DEDUPING_MS,
     }
   );

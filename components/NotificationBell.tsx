@@ -18,9 +18,8 @@ interface Notification {
   created_at: string;
 }
 
-const NOTIFICATION_LIST_REFRESH_MS = 60_000;
-const NOTIFICATION_COUNT_REFRESH_MS = 60_000;
-const NOTIFICATION_DEDUPING_MS = 30_000;
+const NOTIFICATION_COUNT_REFRESH_MS = 180_000;
+const NOTIFICATION_DEDUPING_MS = 60_000;
 
 function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString);
@@ -91,14 +90,15 @@ export default function NotificationBell({ className = '' }: { className?: strin
     [token]
   );
 
-  // Fetch notifications
+  // Chỉ tải danh sách đầy đủ khi người dùng mở chuông. Badge dùng endpoint đếm
+  // riêng nên không cần truyền 15 bản ghi và polling danh sách trên mọi trang.
   const { data: notificationsData, mutate: mutateNotifications } = useSWR(
-    user?.email ? '/api/notifications?limit=15' : null,
+    user?.email && isOpen ? '/api/notifications?limit=15' : null,
     fetcher,
     {
-      refreshInterval: NOTIFICATION_LIST_REFRESH_MS,
       refreshWhenHidden: false,
       refreshWhenOffline: false,
+      revalidateOnFocus: true,
       dedupingInterval: NOTIFICATION_DEDUPING_MS,
     }
   );
@@ -111,6 +111,7 @@ export default function NotificationBell({ className = '' }: { className?: strin
       refreshInterval: NOTIFICATION_COUNT_REFRESH_MS,
       refreshWhenHidden: false,
       refreshWhenOffline: false,
+      revalidateOnFocus: true,
       dedupingInterval: NOTIFICATION_DEDUPING_MS,
     }
   );

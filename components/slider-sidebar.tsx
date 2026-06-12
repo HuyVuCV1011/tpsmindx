@@ -2,11 +2,7 @@
 
 import { Eye, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
-import useSWR from 'swr'
 import { normalizeStorageUrl } from '@/lib/storage-url'
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
-const TRENDING_POSTS_REFRESH_MS = 120_000
 
 interface Post {
     id: string | number
@@ -28,20 +24,7 @@ const POST_TYPE_LABELS: Record<string, string> = {
     'thông-báo': 'Thông báo',
 }
 
-export default function SliderSidebar() {
-    const { data: posts = [] } = useSWR<Post[]>(
-        '/api/truyenthong/posts?status=published&limit=5&sort=view_count',
-        fetcher,
-        {
-            refreshInterval: TRENDING_POSTS_REFRESH_MS,
-            refreshWhenHidden: false,
-            refreshWhenOffline: false,
-            dedupingInterval: 30_000,
-        }
-    )
-
-    const trendingPosts = Array.isArray(posts) ? posts.slice(0, 5) : []
-
+export default function SliderSidebar({ posts }: { posts: Post[] }) {
     return (
         <div className="h-full max-h-full bg-white rounded-2xl border border-gray-200/80 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 flex flex-col">
             {/* Header */}
@@ -54,16 +37,19 @@ export default function SliderSidebar() {
 
             {/* Trending Posts List */}
             <div className="flex-1 min-h-0 p-5 space-y-3 overflow-y-auto">
-                {trendingPosts.map((post, index) => (
+                {posts.map((post, index) => (
                     <Link
                         key={post.id}
                         href={`/user/truyenthong/${post.slug || post.id}`}
+                        prefetch={false}
                         className="flex gap-4 group hover:bg-gradient-to-r hover:from-red-50 hover:to-orange-50 -mx-3 px-3 py-3 rounded-xl transition-all duration-200 border border-transparent hover:border-red-100 hover:shadow-md"
                     >
                         <div className="relative rounded-xl overflow-hidden flex-shrink-0 bg-gray-100 shadow-md ring-1 ring-black/5 w-16 h-16">
                             <img
                                 src={normalizeStorageUrl(post.banner_image || post.featured_image) || '/placeholder-banner.jpg'}
                                 alt={post.title}
+                                loading="lazy"
+                                decoding="async"
                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                             />
                             <div className="absolute top-1 left-1 w-5 h-5 bg-gradient-to-br from-red-600 to-red-700 rounded-full flex items-center justify-center text-[10px] font-black text-white shadow-lg shadow-red-200">
