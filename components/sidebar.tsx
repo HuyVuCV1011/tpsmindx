@@ -33,8 +33,8 @@ import { authHeaders } from '@/lib/auth-headers'
 import useSWR from 'swr'
 import NotificationBell from '@/components/NotificationBell'
 
-const NOTIFICATION_COUNT_REFRESH_MS = 60_000
-const NOTIFICATION_DEDUPING_MS = 30_000
+const NOTIFICATION_COUNT_REFRESH_MS = 180_000
+const NOTIFICATION_DEDUPING_MS = 60_000
 
 export function Sidebar() {
   const { isOpen, setIsOpen, requestExpandLabels } = useSidebar()
@@ -62,6 +62,7 @@ export function Sidebar() {
       refreshInterval: NOTIFICATION_COUNT_REFRESH_MS,
       refreshWhenHidden: false,
       refreshWhenOffline: false,
+      revalidateOnFocus: true,
       dedupingInterval: NOTIFICATION_DEDUPING_MS,
     },
   )
@@ -598,6 +599,7 @@ export function Sidebar() {
           <div className="flex h-14 items-center justify-between border border-gray-200 bg-white px-3 py-2 shadow-sm">
             <Link
               href={isUserArea ? '/user/truyenthong' : '/admin/truyenthong'}
+              prefetch={false}
               className="flex items-center gap-2 hover:opacity-80 transition-opacity"
             >
               <Image
@@ -665,6 +667,7 @@ export function Sidebar() {
           <div className="relative flex h-14 items-center justify-between bg-[#a1001f] px-4 text-white shadow-md py-2">
             <Link
               href={isUserArea ? '/user/truyenthong' : '/admin/truyenthong'}
+              prefetch={false}
               onClick={() => setIsOpen(false)}
               className="flex items-center gap-2 hover:opacity-80 transition-opacity"
             >
@@ -739,6 +742,7 @@ export function Sidebar() {
                         {item.href ? (
                           <Link
                             href={item.href}
+                            prefetch={false}
                             data-tour={getTourTargetForHref(item.href)}
                             onClick={() => {
                               toggleSubmenu(item.label)
@@ -853,6 +857,7 @@ export function Sidebar() {
                                         <Link
                                           key={nestedItem.href}
                                           href={nestedItem.href}
+                                          prefetch={false}
                                           data-tour={getTourTargetForHref(
                                             nestedItem.href,
                                           )}
@@ -882,6 +887,7 @@ export function Sidebar() {
                               <Link
                                 key={subItem.href}
                                 href={subItem.href}
+                                prefetch={false}
                                 data-tour={getTourTargetForHref(subItem.href)}
                                 onClick={closeSidebarOnMobile}
                                 className={cn(
@@ -901,6 +907,7 @@ export function Sidebar() {
                   ) : (
                     <Link
                       href={item.href}
+                      prefetch={false}
                       data-tour={getTourTargetForHref(item.href)}
                       onClick={() => {
                         handleTopLevelTabNavigation()
@@ -946,7 +953,7 @@ export function Sidebar() {
                   size="sm"
                   className="mb-2 w-full justify-start text-xs"
                 >
-                  <Link href="/admin/dashboard" onClick={closeSidebarOnMobile}>
+                  <Link href="/admin/dashboard" prefetch={false} onClick={closeSidebarOnMobile}>
                     <Icon icon={BarChart3} size="sm" />
                     Chuyển sang quản lý
                   </Link>
@@ -959,7 +966,7 @@ export function Sidebar() {
                   size="sm"
                   className="mb-2 w-full justify-start border-[#a1001f]/30 text-xs text-[#a1001f] hover:bg-[#a1001f]/5 hover:text-[#a1001f]"
                 >
-                  <Link href="/user/truyenthong" onClick={closeSidebarOnMobile}>
+                  <Link href="/user/truyenthong" prefetch={false} onClick={closeSidebarOnMobile}>
                     <Icon icon={GraduationCap} size="sm" />
                     Chuyển sang giáo viên
                   </Link>
@@ -967,6 +974,7 @@ export function Sidebar() {
               )}
               <Link
                 href={profileHref}
+                prefetch={false}
                 onClick={closeSidebarOnMobile}
                 className={cn(
                   'mb-2 block cursor-pointer rounded-lg border p-2 shadow-sm transition-all duration-300 hover:scale-[1.01] hover:border-[#a1001f]/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a1001f] focus-visible:ring-offset-2',

@@ -3,6 +3,10 @@
 import { toast } from '@/lib/app-toast';
 import { useAuth } from "@/lib/auth-context";
 import { logger } from '@/lib/logger';
+import {
+  resolveAuthenticatedLanding,
+  type TeacherSyncState,
+} from '@/lib/teacher-session-routing';
 import { Eye, EyeOff } from 'lucide-react';
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -13,26 +17,17 @@ const SAVED_LOGIN_KEY = 'tps_saved_login_account';
 type LandingRole = 'teacher' | 'manager';
 type AppRole = LandingRole | 'super_admin' | 'admin' | 'hr';
 
-function resolveTeacherLanding(teacherSync?: { foundInDatabase?: boolean }): string {
-  return teacherSync?.foundInDatabase ? '/user/truyenthong' : '/checkdatasource'
-}
-
 function resolvePostLoginPath(options: {
   selectedRole: LandingRole;
+  userRole: string;
   isAdmin: boolean;
-  teacherSync?: { foundInDatabase?: boolean };
+  teacherSync?: TeacherSyncState;
 }): { redirectPath: string; isAdminLanding: boolean } {
-  const { selectedRole, isAdmin, teacherSync } = options;
-  const isAdminLanding = selectedRole === 'manager' && isAdmin;
-  const isTeacherLandingForPrivilegedUser = selectedRole === 'teacher' && isAdmin;
+  const redirectPath = resolveAuthenticatedLanding(options);
 
   return {
-    redirectPath: isAdminLanding
-      ? '/admin/dashboard'
-      : isTeacherLandingForPrivilegedUser
-        ? '/user/truyenthong'
-      : resolveTeacherLanding(teacherSync),
-    isAdminLanding,
+    redirectPath,
+    isAdminLanding: redirectPath === '/admin/dashboard',
   };
 }
 
@@ -90,7 +85,9 @@ export default function LoginPage() {
       if (user) {
         const { redirectPath } = resolvePostLoginPath({
           selectedRole: role,
+          userRole: user.role,
           isAdmin: Boolean(user.isAdmin),
+          teacherSync: user.teacherSync,
         });
         logger.info('User already logged in, redirecting', { email: user.email, role: user.role, path: redirectPath });
         router.replace(redirectPath);
@@ -106,15 +103,17 @@ export default function LoginPage() {
     setShowPassword(prev => !prev);
   }, []);
 
-  /** Determine teacher redirect based on teacherSync from API response. */
-  function resolveTeacherRedirect(teacherSync?: { foundInDatabase?: boolean }, teacherEmail?: string): string {
-    if (teacherSync?.foundInDatabase) {
-      if (teacherEmail) {
-        try { localStorage.setItem('tps_profile_check_done_email', teacherEmail.toLowerCase()); } catch { /* */ }
+  function persistTeacherSync(teacherSync?: TeacherSyncState, teacherEmail?: string) {
+    if (!teacherSync || !teacherEmail) return;
+    try {
+      if (teacherSync.foundInDatabase) {
+        localStorage.setItem('tps_profile_check_done_email', teacherEmail.toLowerCase());
+      } else if (!teacherSync.dbUnavailable) {
+        localStorage.removeItem('tps_profile_check_done_email');
       }
-      return '/user/truyenthong';
+    } catch {
+      /* localStorage is only a compatibility cache, never an auth source */
     }
-    return '/checkdatasource';
   }
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -154,7 +153,7 @@ export default function LoginPage() {
         localId?: string;
         isAdmin?: boolean;
         permissions?: string[];
-        teacherSync?: { foundInDatabase?: boolean };
+        teacherSync?: TeacherSyncState;
       } = {};
       try {
         appAuthData = await appAuthResponse.json();
@@ -176,12 +175,15 @@ export default function LoginPage() {
           isAdmin: Boolean(appAuthData.isAdmin),
           isAppUser: true as const,
           permissions: appAuthData.permissions ?? [],
+          teacherSync: appAuthData.teacherSync,
         };
 
         updateUser(userData, '');
+        persistTeacherSync(appAuthData.teacherSync, emailResolved);
 
         const landing = resolvePostLoginPath({
           selectedRole: role,
+          userRole: userData.role,
           isAdmin: Boolean(appAuthData.isAdmin),
           teacherSync: appAuthData.teacherSync,
         });
@@ -235,6 +237,7 @@ export default function LoginPage() {
         isAppUser?: boolean;
         permissions?: string[];
         userRoles?: string[];
+        teacherSync?: TeacherSyncState;
       } = {
         email: data.email,
         displayName: data.displayName,
@@ -244,24 +247,29 @@ export default function LoginPage() {
         isAdmin: Boolean(data.isAdmin),
         permissions: Array.isArray(data.permissions) ? data.permissions : [],
         userRoles: Array.isArray(data.userRoles) ? data.userRoles : [],
+        teacherSync: data?.teacherSync,
       };
 
       logger.success('Firebase login successful', { email: userData.email, role: userData.role });
 
       const landing = resolvePostLoginPath({
         selectedRole: role,
+        userRole: userData.role,
         isAdmin: Boolean(userData.isAdmin),
         teacherSync: data?.teacherSync,
       });
 
-      let finalRedirectPath = landing.redirectPath;
+      const finalRedirectPath = landing.redirectPath;
+      persistTeacherSync(data?.teacherSync, userData.email);
 
       if (landing.isAdminLanding) {
         toast.success(`Chào mừng Admin ${userData.displayName}!`);
       } else if (serverRole === 'teacher') {
-        finalRedirectPath = resolveTeacherRedirect(data?.teacherSync, userData.email);
-
-        if (!data?.teacherSync?.foundInDatabase) {
+        if (
+          data?.teacherSync &&
+          !data.teacherSync.foundInDatabase &&
+          !data.teacherSync.dbUnavailable
+        ) {
           toast.info('Chưa tìm thấy thông tin giáo viên trong database.', {
             message: 'Vui lòng kiểm tra ở bước tiếp theo.',
             duration: 4500,

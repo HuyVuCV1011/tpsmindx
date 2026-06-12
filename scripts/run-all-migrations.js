@@ -134,7 +134,12 @@ async function main() {
                         CREATE INDEX IF NOT EXISTS idx_system_events_session_id_created_at
                             ON system_events(session_id, created_at DESC);
                 ` },
-                { name: 'fix_assignment_answers_constraint', file: 'fix_assignment_answers_constraint.sql' }
+                { name: 'fix_assignment_answers_constraint', file: 'fix_assignment_answers_constraint.sql' },
+                { name: 'optimize_truyenthong_read_indexes', file: 'optimize_truyenthong_read_indexes.sql' },
+                { name: 'V93_work_schedule_range_index', file: null, sql: `
+                    CREATE INDEX IF NOT EXISTS idx_dangky_lich_lam_date_time
+                        ON dangky_lich_lam(ngay, gio_bat_dau, gio_ket_thuc);
+                ` }
         ];
 
 

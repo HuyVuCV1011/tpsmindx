@@ -2159,6 +2159,28 @@ const migrations: Migration[] = [
       WHERE is_read = FALSE;
     `,
   },
+  {
+    name: 'V92_truyenthong_read_indexes',
+    version: 92,
+    sql: `
+      CREATE INDEX IF NOT EXISTS idx_communications_status_created
+      ON communications(status, created_at DESC, id DESC);
+
+      CREATE INDEX IF NOT EXISTS idx_communications_status_views
+      ON communications(status, view_count DESC, id DESC);
+
+      CREATE INDEX IF NOT EXISTS idx_communications_related_posts
+      ON communications(post_type, status, created_at DESC, id DESC);
+    `,
+  },
+  {
+    name: 'V93_work_schedule_range_index',
+    version: 93,
+    sql: `
+      CREATE INDEX IF NOT EXISTS idx_dangky_lich_lam_date_time
+      ON dangky_lich_lam(ngay, gio_bat_dau, gio_ket_thuc);
+    `,
+  },
 ]
 
 // ========== HÀM CHẠY MIGRATIONS ==========

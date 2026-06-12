@@ -464,11 +464,12 @@ export default function ExamRegistrationListPage() {
     void fetchRows(1);
   }, [fetchRows]);
 
-  /** Poll DB nhẹ (sync_check): chỉ dừng khi unmount (đóng tab / rời route), không phụ thuộc tab ẩn hay đang import */
+  /** Poll DB nhẹ khi tab đang hiển thị; kiểm tra ngay khi người dùng quay lại tab. */
   useEffect(() => {
-    const POLL_MS = 20_000;
+    const POLL_MS = 60_000;
     const check = async () => {
       if (typeof window === "undefined") return;
+      if (document.visibilityState !== "visible") return;
       try {
         const params = new URLSearchParams();
         appendListFilters(params, {
@@ -495,7 +496,7 @@ export default function ExamRegistrationListPage() {
       }
     };
     const id = window.setInterval(() => void check(), POLL_MS);
-    /* Về lại tab: check ngay để thấy data mới (poll nền vẫn chạy khi tab ẩn) */
+    /* Về lại tab: check ngay để thấy dữ liệu mới. */
     const onVis = () => {
       if (document.visibilityState === "visible") void check();
     };

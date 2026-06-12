@@ -9,7 +9,6 @@ interface Post {
     slug: string
     title: string
     description: string
-    content: string
     featured_image: string
     banner_image: string
     thumbnail_position?: string
@@ -21,9 +20,10 @@ interface Post {
 
 interface HeroSectionProps {
     posts: Post[]
+    trendingPosts: Post[]
 }
 
-export default function HeroSection({ posts }: HeroSectionProps) {
+export default function HeroSection({ posts, trendingPosts }: HeroSectionProps) {
     const sliderRef = useRef<HTMLDivElement>(null)
     const sidebarRef = useRef<HTMLDivElement>(null)
     const [sliderHeight, setSliderHeight] = useState<number | null>(null)
@@ -68,7 +68,7 @@ export default function HeroSection({ posts }: HeroSectionProps) {
                         height: sliderHeight && window.innerWidth >= 1024 ? `${sliderHeight}px` : 'auto'
                     }}
                 >
-                    <SliderSidebar />
+                    <SliderSidebar posts={trendingPosts} />
                 </div>
             </div>
         </section>

@@ -667,22 +667,8 @@ export default function TeacherAssignmentPage() {
       try {
         if (!isBackgroundUpdate) setExamLoading(true)
 
-        let canonicalTeacherCode = ''
-        if (user?.email) {
-          try {
-            const res = await fetch(
-              `/api/teachers/info?email=${encodeURIComponent(user.email)}`,
-              { headers: authHeaders(token) },
-            )
-            const data = await res.json()
-            canonicalTeacherCode = (data?.teacher?.code || '').toString().trim()
-            if (canonicalTeacherCode && canonicalTeacherCode !== teacherCode) {
-              setTeacherCode(canonicalTeacherCode)
-            }
-          } catch {
-            // Keep fallback behavior below when teacher lookup is unavailable.
-          }
-        }
+        // TeacherProvider already resolved the canonical code before this loader runs.
+        const canonicalTeacherCode = teacherCode.trim()
 
         const candidates = new Set<string>()
         const normalizedTeacherCode = teacherCode?.trim()
@@ -729,7 +715,7 @@ export default function TeacherAssignmentPage() {
         if (!isBackgroundUpdate) setExamLoading(false)
       }
     },
-    [teacherCode, token, user],
+    [teacherCode, user],
   )
 
   const searchParams = useSearchParams()
