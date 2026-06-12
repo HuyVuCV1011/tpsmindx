@@ -1,12 +1,12 @@
 /**
  * exam-registrations/route.ts
  *
- * Flow má»›i: Registration = táº¡o record trong chuyen_sau_results
- *   - KhÃ´ng cÃ²n báº£ng chuyen_sau_dangky / chuyen_sau_phancong
- *   - GET  â†’ xem lá»‹ch thi / results cá»§a user
- *   - POST â†’ Ä‘Äƒng kÃ½ = INSERT chuyen_sau_results (trang_thai = 'da_dang_ky')
- *   - PUT  â†’ cáº­p nháº­t tráº¡ng thÃ¡i result (há»§y, báº¯t Ä‘áº§u, v.v.)
- *   - DELETE â†’ há»§y Ä‘Äƒng kÃ½ (xÃ³a result náº¿u chÆ°a thi)
+ * Flow mới: Registration = tạo record trong chuyen_sau_results
+ *   - Không còn bảng chuyen_sau_dangky / chuyen_sau_phancong
+ *   - GET  → xem lịch thi / results của user
+ *   - POST → đăng ký = INSERT chuyen_sau_results (trang_thai = 'da_dang_ky')
+ *   - PUT  → cập nhật trạng thái result (hủy, bắt đầu, v.v.)
+ *   - DELETE → hủy đăng ký (xóa result nếu chưa thi)
  */
 
 import pool from '@/lib/db';
@@ -22,7 +22,7 @@ import { eventScheduleTsInstantExpr } from '@/lib/event-schedule-time';
 import { insertExamRegistration } from '@/lib/exam-registration-insert';
 import { NextRequest, NextResponse } from 'next/server';
 
-/** Má»™t sá»‘ báº£n triá»ƒn khai cÅ© chÆ°a cÃ³ cá»™t `updated_at` â€” cache theo process, khÃ´ng cáº§n migration */
+/** Một số bản triển khai cũ chưa có cột `updated_at` — cache theo process, không cần migration */
 let cachedChuyenSauResultsHasUpdatedAt: boolean | null = null;
 
 async function chuyenSauResultsHasUpdatedAtColumn(): Promise<boolean> {
@@ -46,7 +46,7 @@ async function chuyenSauResultsHasUpdatedAtColumn(): Promise<boolean> {
   return cachedChuyenSauResultsHasUpdatedAt;
 }
 
-// â”€â”€â”€ GET â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── GET ──────────────────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,9 +59,9 @@ export async function GET(request: NextRequest) {
     const resultId = searchParams.get('result_id');
     const thangDk = searchParams.get('thang_dk');
     const namDk = searchParams.get('nam_dk');
-    /** YYYY-MM â€” lá»c theo thÃ¡ng/nÄƒm Ä‘Äƒng kÃ½ (thang_dk / nam_dk) */
+    /** YYYY-MM — lọc theo tháng/năm đăng ký (thang_dk / nam_dk) */
     const monthYm = searchParams.get('month');
-    /** Má»™t hoáº·c nhiá»u giÃ¡ trá»‹: láº·p `subject_q` hoáº·c chuá»—i phÃ¢n tÃ¡ch bá»Ÿi dáº¥u pháº©y â€” OR vá»›i nhau */
+    /** Một hoặc nhiều giá trị: lặp `subject_q` hoặc chuỗi phân tách bởi dấu phẩy — OR với nhau */
     const parseMultiQ = (key: string): string[] => {
       const raw = searchParams.getAll(key).flatMap((s) => s.split(','));
       const out: string[] = [];
@@ -81,10 +81,10 @@ export async function GET(request: NextRequest) {
     const xuLyFilter = searchParams.get('xu_ly_diem')?.trim();
     const registrationType = searchParams.get('registration_type')?.trim();
     const hasScore = searchParams.get('has_score')?.trim();
-    /** Chá»‰ Ä‘áº¿m + thá»i Ä‘iá»ƒm thay Ä‘á»•i gáº§n nháº¥t â€” dÃ¹ng poll nháº¹ tá»« admin */
+    /** Chỉ đếm + thời điểm thay đổi gần nhất — dùng poll nhẹ từ admin */
     const syncCheck = searchParams.get('sync_check') === '1';
 
-    /** PhÃ¢n trang (tÃ¹y chá»n): chá»‰ Ã¡p dá»¥ng khi cÃ³ `limit` â€” khÃ´ng gá»­i `limit` thÃ¬ tráº£ toÃ n bá»™ (tÆ°Æ¡ng thÃ­ch user / xuáº¥t CSV). */
+    /** Phân trang (tùy chọn): chỉ áp dụng khi có `limit` — không gửi `limit` thì trả toàn bộ (tương thích user / xuất CSV). */
     const limitRaw = searchParams.get('limit');
     const pageRaw = searchParams.get('page');
     const offsetRaw = searchParams.get('offset');
@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
       values.push(scheduleId);
     }
     if (teacherCode) {
-      /** TÃ¬m gáº§n Ä‘Ãºng (chuá»—i con) â€” khá»›p UX Ã´ Â«MÃ£ GVÂ» trÃªn admin */
+      /** Tìm gần đúng (chuỗi con) — khớp UX ô «Mã GV» trên admin */
       conditions.push(
         `POSITION(LOWER($${values.length + 1}) IN LOWER(COALESCE(r.ma_giao_vien, ''))) > 0`,
       );
@@ -209,13 +209,13 @@ export async function GET(request: NextRequest) {
 
     if (registrationType === 'official') {
       conditions.push(`NOT (
-        LOWER(TRIM(COALESCE(r.hinh_thuc, ''))) LIKE '%bá»• sung%'
+        LOWER(TRIM(COALESCE(r.hinh_thuc, ''))) LIKE '%bổ sung%'
         OR LOWER(TRIM(COALESCE(r.hinh_thuc, ''))) LIKE '%bo sung%'
         OR LOWER(TRIM(COALESCE(r.hinh_thuc, ''))) = 'additional'
       )`);
     } else if (registrationType === 'additional') {
       conditions.push(`(
-        LOWER(TRIM(COALESCE(r.hinh_thuc, ''))) LIKE '%bá»• sung%'
+        LOWER(TRIM(COALESCE(r.hinh_thuc, ''))) LIKE '%bổ sung%'
         OR LOWER(TRIM(COALESCE(r.hinh_thuc, ''))) LIKE '%bo sung%'
         OR LOWER(TRIM(COALESCE(r.hinh_thuc, ''))) = 'additional'
       )`);
@@ -317,10 +317,10 @@ export async function GET(request: NextRequest) {
          ${eventScheduleTsInstantExpr('es', 'ket_thuc_luc')}                                               AS close_at,
          COALESCE(${eventScheduleTsInstantExpr('es', 'bat_dau_luc')}, r.lich_thi_dk, r.tao_luc)             AS scheduled_at,
          es.loai_su_kien,
-         -- registration_type: map hinh_thuc â†’ official/additional
-         -- Chá»‰ match chÃ­nh xÃ¡c 'additional', 'bá»• sung', 'bo sung' â€” trÃ¡nh false positive vá»›i 'robotics', 'combo', v.v.
+         -- registration_type: map hinh_thuc → official/additional
+         -- Chỉ match chính xác 'additional', 'bổ sung', 'bo sung' — tránh false positive với 'robotics', 'combo', v.v.
          CASE
-           WHEN LOWER(TRIM(COALESCE(r.hinh_thuc, ''))) LIKE '%bá»• sung%'
+           WHEN LOWER(TRIM(COALESCE(r.hinh_thuc, ''))) LIKE '%bổ sung%'
              OR LOWER(TRIM(COALESCE(r.hinh_thuc, ''))) LIKE '%bo sung%'
              OR LOWER(TRIM(COALESCE(r.hinh_thuc, ''))) = 'additional'
            THEN 'additional'
@@ -333,11 +333,11 @@ export async function GET(request: NextRequest) {
               THEN r.id ELSE NULL END                                  AS assignment_id,
          -- assignment_status
          CASE
-           WHEN LOWER(TRIM(COALESCE(r.xu_ly_diem, ''))) IN ('Ä‘Ã£ hoÃ n thÃ nh', 'da thi', 'Ä‘Ã£ duyá»‡t', 'tá»« chá»‘i')
+           WHEN LOWER(TRIM(COALESCE(r.xu_ly_diem, ''))) IN ('đã hoàn thành', 'da thi', 'đã duyệt', 'từ chối')
              THEN 'graded'
            WHEN r.diem IS NOT NULL AND r.diem > 0
              THEN 'graded'
-           WHEN LOWER(TRIM(COALESCE(r.xu_ly_diem, ''))) = 'chá» giáº£i trÃ¬nh'
+           WHEN LOWER(TRIM(COALESCE(r.xu_ly_diem, ''))) = 'chờ giải trình'
              THEN 'expired'
            WHEN r.id_de_thi IS NOT NULL
              THEN 'assigned'
@@ -345,7 +345,7 @@ export async function GET(request: NextRequest) {
          END                                                           AS assignment_status,
          -- score_status
          CASE
-           WHEN LOWER(TRIM(COALESCE(r.xu_ly_diem, ''))) IN ('Ä‘Ã£ hoÃ n thÃ nh', 'Ä‘Ã£ duyá»‡t', 'tá»« chá»‘i')
+           WHEN LOWER(TRIM(COALESCE(r.xu_ly_diem, ''))) IN ('đã hoàn thành', 'đã duyệt', 'từ chối')
              THEN 'graded'
            WHEN r.diem IS NULL
              THEN 'null'
@@ -382,7 +382,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Há»‡ thá»‘ng Ä‘ang báº­n (quÃ¡ nhiá»u káº¿t ná»‘i DB). Vui lÃ²ng thá»­ láº¡i sau vÃ i giÃ¢y.',
+          error: 'Hệ thống đang bận (quá nhiều kết nối DB). Vui lòng thử lại sau vài giây.',
           code: 'DB_CONNECTION_LIMIT',
         },
         { status: 503 },
@@ -393,7 +393,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// â”€â”€â”€ POST: ÄÄƒng kÃ½ thi â†’ táº¡o results record â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── POST: Đăng ký thi → tạo results record ──────────────────────────────────
 
 export async function POST(request: NextRequest) {
   try {
@@ -405,13 +405,17 @@ export async function POST(request: NextRequest) {
     const isAdmin = Boolean(auth.resolvedAccess.isAdmin);
 
     const body = await request.json();
+    console.log('[exam-registrations POST] Request body:', JSON.stringify(body, null, 2));
+
     const targetEmail = String(body?.dia_chi_email || body?.email || '').trim();
     const teacherCode = String(body?.ma_giao_vien || body?.teacher_code || '').trim();
 
+    // Kiểm tra: user chỉ được đăng ký cho chính mình (trừ admin)
     if (targetEmail) {
       const denied = rejectIfEmailNotSelf(auth.sessionEmail, isAdmin, targetEmail);
       if (denied) return denied;
     }
+    // Kiểm tra: không được tra cứu dữ liệu teacher_code của người khác
     if (teacherCode) {
       const denied = await rejectIfDatasourceLookupForbidden(
         auth.sessionEmail,
@@ -422,6 +426,7 @@ export async function POST(request: NextRequest) {
       if (denied) return denied;
     }
 
+    // Tự điền email từ session nếu body không cung cấp
     const registrationBody = {
       ...body,
       ...(targetEmail ? {} : { dia_chi_email: auth.sessionEmail }),
@@ -429,6 +434,7 @@ export async function POST(request: NextRequest) {
 
     const result = await insertExamRegistration(pool, registrationBody);
     if (!result.ok) {
+      console.error('[exam-registrations POST] Insert failed:', result.error);
       return NextResponse.json(
         {
           success: false,
@@ -438,17 +444,22 @@ export async function POST(request: NextRequest) {
         { status: result.httpStatus }
       );
     }
+    console.log('[exam-registrations POST] Success:', result.data);
     return NextResponse.json(
-      { success: true, data: result.data, message: 'ÄÄƒng kÃ½ thi thÃ nh cÃ´ng' },
+      { success: true, data: result.data, message: 'Đăng ký thi thành công' },
       { status: 201 }
     );
   } catch (error) {
-    console.error('Error creating registration:', error);
-    return NextResponse.json({ success: false, error: 'Invalid request body' }, { status: 400 });
+    console.error('[exam-registrations POST] Unexpected error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({
+      success: false,
+      error: `Invalid request body: ${errorMessage}`,
+    }, { status: 400 });
   }
 }
 
-// â”€â”€â”€ PUT: Cáº­p nháº­t tráº¡ng thÃ¡i result â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── PUT: Cập nhật trạng thái result ─────────────────────────────────────────
 
 export async function PUT(request: NextRequest) {
   try {
@@ -456,7 +467,7 @@ export async function PUT(request: NextRequest) {
     if (!authGate.ok) return authGate.response;
 
     const body = await request.json();
-    const { result_id, status, set_code, notes } = body;
+    const { result_id } = body;
 
     if (!result_id) {
       return NextResponse.json({ success: false, error: 'result_id is required' }, { status: 400 });
@@ -493,7 +504,7 @@ export async function PUT(request: NextRequest) {
     }
 
     if (clauses.length === 0) {
-      return NextResponse.json({ success: false, error: 'KhÃ´ng cÃ³ trÆ°á»ng nÃ o Ä‘á»ƒ cáº­p nháº­t' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Không có trường nào để cập nhật' }, { status: 400 });
     }
 
     values.push(result_id);
@@ -503,7 +514,7 @@ export async function PUT(request: NextRequest) {
     );
 
     if (result.rows.length === 0) {
-      return NextResponse.json({ success: false, error: 'KhÃ´ng tÃ¬m tháº¥y result' }, { status: 404 });
+      return NextResponse.json({ success: false, error: 'Không tìm thấy result' }, { status: 404 });
     }
 
     return NextResponse.json({ success: true, data: result.rows[0] });
@@ -513,7 +524,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// â”€â”€â”€ DELETE: Há»§y Ä‘Äƒng kÃ½ (chá»‰ Ä‘Æ°á»£c khi chÆ°a thi) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── DELETE: Hủy đăng ký (chỉ được khi chưa thi) ────────────────────────────
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -530,7 +541,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'result_id is required' }, { status: 400 });
     }
 
-    // Chá»‰ cho xÃ³a náº¿u chÆ°a thi (xu_ly_diem = 'chá» giáº£i trÃ¬nh' = chÆ°a ná»™p bÃ i)
+    // Chỉ cho xóa nếu chưa thi (xu_ly_diem = 'chờ giải trình' = chưa nộp bài)
     const denied = await rejectIfChuyenSauResultNotOwned(
       auth.sessionEmail,
       Boolean(auth.resolvedAccess.isAdmin),
@@ -540,19 +551,19 @@ export async function DELETE(request: NextRequest) {
 
     const result = await pool.query(
       `DELETE FROM chuyen_sau_results
-       WHERE id = $1 AND xu_ly_diem = 'chá» giáº£i trÃ¬nh'
+       WHERE id = $1 AND xu_ly_diem = 'chờ giải trình'
        RETURNING id, dia_chi_email, ma_giao_vien`,
       [resultId]
     );
 
     if (result.rows.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'KhÃ´ng thá»ƒ há»§y - result khÃ´ng tá»“n táº¡i hoáº·c Ä‘Ã£ thi rá»“i.' },
+        { success: false, error: 'Không thể hủy - result không tồn tại hoặc đã thi rồi.' },
         { status: 409 }
       );
     }
 
-    return NextResponse.json({ success: true, message: 'ÄÃ£ há»§y Ä‘Äƒng kÃ½ thÃ nh cÃ´ng' });
+    return NextResponse.json({ success: true, message: 'Đã hủy đăng ký thành công' });
   } catch (error) {
     console.error('Error deleting registration:', error);
     return NextResponse.json({ success: false, error: 'Failed to delete registration' }, { status: 500 });
