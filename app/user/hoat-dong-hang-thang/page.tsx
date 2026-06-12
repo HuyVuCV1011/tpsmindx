@@ -2760,7 +2760,7 @@ export default function MonthlyActivitiesPage() {
       )}
 
       {showDayEventsModal && selectedDate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-modal-backdrop-custom flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-3xl rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <h3 className="text-lg font-bold text-gray-900">
@@ -3033,7 +3033,7 @@ export default function MonthlyActivitiesPage() {
       )}
 
       {showParticipantsModal && participantsEvent && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-modal-raised-custom flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <div>
@@ -3107,7 +3107,7 @@ export default function MonthlyActivitiesPage() {
       )}
 
       {showLectureRegisterModal && selectedLectureEvent && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-modal-raised-custom flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <div>

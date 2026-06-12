@@ -324,7 +324,7 @@ export async function PUT(
       );
 
       if (status === 'published' && currentPost.status !== 'published') {
-        createNotificationForEveryone({
+        await createNotificationForEveryone({
           title: `Bài viết mới: ${safeTitle}`,
           content: safeDescription,
           type: 'communication',

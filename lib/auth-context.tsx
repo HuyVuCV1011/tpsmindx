@@ -37,7 +37,7 @@ interface AuthContextType {
   user: User | null
   token: string | null
   isLoading: boolean
-  logout: () => void
+  logout: (redirectPath?: string) => void
   updateUser: (user: User, token: string) => void
   refreshPermissions: () => Promise<void>
 }
@@ -208,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []) // Empty dependency array - only run once
 
-  const logout = useCallback(() => {
+  const logout = useCallback((redirectPath = '/login') => {
     try {
       logger.info('Logging out user')
 
@@ -223,7 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast.success('Đăng xuất thành công!', { icon: '👋' })
       logger.success('User logged out successfully')
 
-      router.push('/login')
+      router.push(redirectPath)
     } catch (error: any) {
       logger.error('Error during logout', { error: error.message })
       toast.error('Có lỗi khi đăng xuất')

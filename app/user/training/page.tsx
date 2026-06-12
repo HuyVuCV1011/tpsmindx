@@ -11,6 +11,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
+import { buildBrowserLoginRedirectPath } from '@/lib/auth-redirect'
 import { useAuth } from '@/lib/auth-context'
 import { setVideo } from '@/lib/redux/features/trainingSlice'
 import { useAppDispatch } from '@/lib/redux/hooks'
@@ -199,7 +200,7 @@ export default function TrainingPage() {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       localStorage.removeItem('refreshToken')
-      window.location.href = '/login'
+      window.location.href = buildBrowserLoginRedirectPath(window.location)
       throw new Error('Unauthorized')
     }
 
@@ -467,7 +468,7 @@ export default function TrainingPage() {
   // localStorage guard modal
   if (missingProfile) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-0 z-modal-backdrop-custom flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center">
           <div className="text-4xl mb-4">⚠️</div>
           <h2 className="text-lg font-bold text-slate-800 mb-2">

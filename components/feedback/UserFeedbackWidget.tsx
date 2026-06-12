@@ -312,7 +312,7 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
   return (
     <div
       ref={wrapperRef}
-      className="pointer-events-none fixed z-[15] h-[160px] w-[160px]"
+      className="pointer-events-none fixed z-mascot h-[160px] w-[160px]"
       style={{
         bottom: 'calc(env(safe-area-inset-bottom, 0px) + 0px)',
         right: 'calc(env(safe-area-inset-right, 0px) + 1rem)',
@@ -329,7 +329,7 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
           style={{
             bottom: '125px',
             right: '0px',
-            zIndex: 1001,
+            zIndex: 30,
             width: '160px',
           }}
         >
@@ -523,7 +523,7 @@ export default function UserFeedbackWidget() {
 
       {open && (
         <div
-          className="fixed inset-0 z-1001 bg-black/40 flex items-center justify-center p-4"
+          className="fixed inset-0 z-modal-backdrop-custom bg-black/40 flex items-center justify-center p-4"
           onClick={(e) => {
             if (e.target === e.currentTarget) setOpen(false)
           }}
@@ -701,7 +701,7 @@ export default function UserFeedbackWidget() {
       )}
 
       {previewImages && previewImages.length > 0 && (
-        <div className="fixed inset-0 z-1100 bg-black/80 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-modal-raised-custom bg-black/80 flex items-center justify-center p-4">
           <div className="relative w-full max-w-4xl">
             <button
               type="button"

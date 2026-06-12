@@ -181,7 +181,7 @@ function FilterDialog({ filter, setFilter, allCenters, onClose }: {
   const isFiltering = filter.khungGio !== null || filter.coSo !== null || filter.khoi !== null || filter.linhHoat !== null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-modal-backdrop-custom flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between rounded-t-2xl bg-[#a1001f] px-5 py-4">
           <div className="flex items-center gap-2">
@@ -292,7 +292,7 @@ function DetailModal({ detail, filter, areas, isSuperAdmin, onClose }: {
   const khacKhoi = hasKhoiFilter ? allMentors.filter(m => getKhoiLabel(m.khoi_final) !== filter.khoi) : []
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-modal-backdrop-custom flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
         className={`w-full rounded-2xl bg-white shadow-2xl flex flex-col ${twoColumns ? 'max-w-5xl' : 'max-w-lg'}`}
         style={{ height: '884px', maxHeight: '90vh' }}

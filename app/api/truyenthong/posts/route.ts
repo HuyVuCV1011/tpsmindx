@@ -291,7 +291,7 @@ export async function POST(request: NextRequest) {
       );
 
       if (status === 'published') {
-        createNotificationForEveryone({
+        await createNotificationForEveryone({
           title: `Bài viết mới: ${safeTitle}`,
           content: safeDescription,
           type: 'communication',
