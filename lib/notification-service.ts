@@ -37,34 +37,65 @@ export async function createNotificationForEveryone(payload: Omit<NotificationPa
   let client;
   try {
     client = await pool.connect();
-    // Get all active users
-    const usersResult = await client.query('SELECT email FROM app_users WHERE is_active = true');
-    const emails = usersResult.rows
-      .map((row: any) => row.email?.trim().toLowerCase())
-      .filter(Boolean);
-    
-    if (emails.length === 0) return;
+    const result = await client.query<{ inserted_count: number }>(
+      `WITH active_recipients AS (
+         SELECT LOWER(TRIM(email)) AS recipient_email
+         FROM app_users
+         WHERE is_active IS TRUE
+           AND NULLIF(TRIM(email), '') IS NOT NULL
 
-    // Batch insert notifications in chunks of 100 to avoid parameter limit in query (though 65535 is high, batching is safer)
-    const chunkSize = 100;
-    for (let i = 0; i < emails.length; i += chunkSize) {
-      const chunk = emails.slice(i, i + chunkSize);
-      const values: any[] = [];
-      const placeholders: string[] = [];
-      let index = 1;
-      
-      for (const email of chunk) {
-        placeholders.push(`($${index}, $${index + 1}, $${index + 2}, $${index + 3}, $${index + 4}, FALSE, NOW())`);
-        values.push(email, title, content, type, link || null);
-        index += 5;
-      }
-      
-      const queryText = `
-        INSERT INTO notifications (recipient_email, title, content, type, link, is_read, created_at)
-        VALUES ${placeholders.join(', ')}
-      `;
-      await client.query(queryText, values);
-    }
+         UNION
+
+         SELECT LOWER(
+           TRIM(
+             COALESCE(
+               NULLIF(TRIM(work_email), ''),
+               NULLIF(TRIM("Work email"), '')
+             )
+           )
+         ) AS recipient_email
+         FROM teachers
+         WHERE LOWER(
+           TRIM(
+             COALESCE(
+               NULLIF(TRIM(status), ''),
+               NULLIF(TRIM("Status"), ''),
+               'active'
+             )
+           )
+         ) NOT IN ('deactive', 'inactive', 'disabled')
+       ),
+       inserted AS (
+         INSERT INTO notifications (
+           recipient_email,
+           title,
+           content,
+           type,
+           link,
+           is_read,
+           created_at
+         )
+         SELECT
+           recipient_email,
+           $1,
+           $2,
+           $3,
+           $4,
+           FALSE,
+           NOW()
+         FROM active_recipients
+         WHERE recipient_email IS NOT NULL
+           AND POSITION('@' IN recipient_email) > 1
+         RETURNING id
+       )
+       SELECT COUNT(*)::int AS inserted_count
+       FROM inserted`,
+      [title, content, type, link || null]
+    );
+
+    console.info(
+      `[NotificationService] Created notification for ${result.rows[0]?.inserted_count || 0} active recipients`
+    );
   } catch (err) {
     console.error('[NotificationService] Failed to create notifications for everyone:', err);
   } finally {

@@ -1,6 +1,10 @@
 "use client";
 
 import { toast } from '@/lib/app-toast';
+import {
+  appendSafeAuthRedirect,
+  getSafeNextFromBrowser,
+} from '@/lib/auth-redirect';
 import { useAuth } from "@/lib/auth-context";
 import { logger } from '@/lib/logger';
 import {
@@ -29,6 +33,23 @@ function resolvePostLoginPath(options: {
     redirectPath,
     isAdminLanding: redirectPath === '/admin/dashboard',
   };
+}
+
+function resolveFinalPostLoginPath(defaultPath: string): string {
+  if (typeof window === 'undefined') return defaultPath;
+
+  const requestedPath = getSafeNextFromBrowser(window.location);
+  if (!requestedPath) return defaultPath;
+
+  if (defaultPath === '/checkdatasource') {
+    return appendSafeAuthRedirect(
+      defaultPath,
+      requestedPath,
+      window.location.origin,
+    );
+  }
+
+  return requestedPath;
 }
 
 export default function LoginPage() {
@@ -89,8 +110,9 @@ export default function LoginPage() {
           isAdmin: Boolean(user.isAdmin),
           teacherSync: user.teacherSync,
         });
-        logger.info('User already logged in, redirecting', { email: user.email, role: user.role, path: redirectPath });
-        router.replace(redirectPath);
+        const finalRedirectPath = resolveFinalPostLoginPath(redirectPath);
+        logger.info('User already logged in, redirecting', { email: user.email, role: user.role, path: finalRedirectPath });
+        router.replace(finalRedirectPath);
       }
     }
   }, [user, isLoading, loginPreferenceReady, role, router]);
@@ -197,8 +219,9 @@ export default function LoginPage() {
         }
 
         persistRememberedAccount(appAuthData.email || trimmedEmail, role);
-        logger.info('Redirecting app user', { path: landing.redirectPath, role: userData.role });
-        setTimeout(() => { router.replace(landing.redirectPath); }, 500);
+        const finalRedirectPath = resolveFinalPostLoginPath(landing.redirectPath);
+        logger.info('Redirecting app user', { path: finalRedirectPath, role: userData.role });
+        setTimeout(() => { router.replace(finalRedirectPath); }, 500);
         return;
       }
 
@@ -259,7 +282,7 @@ export default function LoginPage() {
         teacherSync: data?.teacherSync,
       });
 
-      const finalRedirectPath = landing.redirectPath;
+      const finalRedirectPath = resolveFinalPostLoginPath(landing.redirectPath);
       persistTeacherSync(data?.teacherSync, userData.email);
 
       if (landing.isAdminLanding) {

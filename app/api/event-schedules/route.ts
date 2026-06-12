@@ -511,23 +511,8 @@ export const POST = withApiProtection(async (request: NextRequest) => {
       );
     }
 
-    // Notify everyone for exam/registration/advanced_training_release events
-    if (loai_su_kien === 'dang_ky' || loai_su_kien === 'registration') {
-      createNotificationForEveryone({
-        title: `Mở đăng ký kiểm tra chuyên sâu`,
-        content: `Sự kiện đăng ký "${ten}" đã được mở. Vui lòng đăng ký tham gia.`,
-        type: 'exam',
-        link: '/user/assignments',
-      }).catch((err) => console.error('Failed to notify everyone of registration event open:', err));
-    } else if (loai_su_kien === 'thi' || loai_su_kien === 'exam') {
-      createNotificationForEveryone({
-        title: `Lịch thi chuyên sâu mới`,
-        content: `Đợt thi chuyên sâu "${ten}" đã được lên lịch. Hãy xem thông tin chi tiết.`,
-        type: 'exam',
-        link: '/user/assignments',
-      }).catch((err) => console.error('Failed to notify everyone of exam event open:', err));
-    } else if (loai_su_kien === 'advanced_training_release') {
-      createNotificationForEveryone({
+    if (loai_su_kien === 'advanced_training_release') {
+      await createNotificationForEveryone({
         title: `Tài liệu đào tạo nâng cao mới`,
         content: `Đã mở tài liệu đào tạo nâng cao mới: "${ten}". Hãy bắt đầu học tập.`,
         type: 'training',
@@ -616,7 +601,7 @@ export const PUT = withApiProtection(async (request: NextRequest) => {
     const attachments = body.attachments !== undefined ? toJsonArray(body.attachments) : undefined;
     
     // Xử lý metadata (bao gồm flow_round)
-    let metadata = body.metadata !== undefined ? (body.metadata && typeof body.metadata === 'object' ? body.metadata : {}) : undefined;
+    const metadata = body.metadata !== undefined ? (body.metadata && typeof body.metadata === 'object' ? body.metadata : {}) : undefined;
     if (metadata !== undefined && body.flow_round != null) {
       metadata.flow_round = Number(body.flow_round);
     }
@@ -710,33 +695,16 @@ export const PUT = withApiProtection(async (request: NextRequest) => {
     }
 
     const oldEvent = currentEventResult.rows[0];
-    const ten_val = ten || oldEvent.ten;
-    const loai_su_kien_val = loai_su_kien || oldEvent.loai_su_kien;
     const isNewScheduled = trang_thai === 'scheduled' && oldEvent.trang_thai !== 'scheduled';
+    const loai_su_kien_val = loai_su_kien || oldEvent.loai_su_kien;
 
-    if (isNewScheduled) {
-      if (loai_su_kien_val === 'dang_ky' || loai_su_kien_val === 'registration') {
-        createNotificationForEveryone({
-          title: `Mở đăng ký kiểm tra chuyên sâu`,
-          content: `Sự kiện đăng ký "${ten_val || ''}" đã được mở. Vui lòng đăng ký tham gia.`,
-          type: 'exam',
-          link: '/user/assignments',
-        }).catch((err) => console.error('Failed to notify everyone of registration event open:', err));
-      } else if (loai_su_kien_val === 'thi' || loai_su_kien_val === 'exam') {
-        createNotificationForEveryone({
-          title: `Lịch thi chuyên sâu mới`,
-          content: `Đợt thi chuyên sâu "${ten_val || ''}" đã được lên lịch. Hãy xem thông tin chi tiết.`,
-          type: 'exam',
-          link: '/user/assignments',
-        }).catch((err) => console.error('Failed to notify everyone of exam event open:', err));
-      } else if (loai_su_kien_val === 'advanced_training_release') {
-        createNotificationForEveryone({
-          title: `Tài liệu đào tạo nâng cao mới`,
-          content: `Đã mở tài liệu đào tạo nâng cao mới: "${ten_val || ''}". Hãy bắt đầu học tập.`,
-          type: 'training',
-          link: '/user/dao-tao-nang-cao',
-        }).catch((err) => console.error('Failed to notify everyone of advanced training release:', err));
-      }
+    if (isNewScheduled && loai_su_kien_val === 'advanced_training_release') {
+      await createNotificationForEveryone({
+        title: `Tài liệu đào tạo nâng cao mới`,
+        content: `Đã mở tài liệu đào tạo nâng cao mới: "${ten || oldEvent.ten || ''}". Hãy bắt đầu học tập.`,
+        type: 'training',
+        link: '/user/dao-tao-nang-cao',
+      }).catch((err) => console.error('Failed to notify everyone of advanced training release:', err));
     }
 
     return NextResponse.json({

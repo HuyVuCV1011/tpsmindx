@@ -6,6 +6,7 @@ import {
   TPS_SESSION_COOKIE,
   verifySessionCookieValue,
 } from '@/lib/session-cookie';
+import { buildLoginRedirectPath } from '@/lib/auth-redirect';
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -31,10 +32,13 @@ export async function proxy(request: NextRequest) {
           { status: 401 },
         );
       }
-      const url = request.nextUrl.clone();
-      url.pathname = '/login';
-      url.searchParams.set('next', pathname);
-      return NextResponse.redirect(url);
+      const requestedPath = `${pathname}${request.nextUrl.search}`;
+      return NextResponse.redirect(
+        new URL(
+          buildLoginRedirectPath(requestedPath, request.nextUrl.origin),
+          request.url,
+        ),
+      );
     }
     const session = await verifySessionCookieValue(raw);
     if (!session) {
@@ -44,10 +48,13 @@ export async function proxy(request: NextRequest) {
           { status: 401 },
         );
       }
-      const url = request.nextUrl.clone();
-      url.pathname = '/login';
-      url.searchParams.set('next', pathname);
-      return NextResponse.redirect(url);
+      const requestedPath = `${pathname}${request.nextUrl.search}`;
+      return NextResponse.redirect(
+        new URL(
+          buildLoginRedirectPath(requestedPath, request.nextUrl.origin),
+          request.url,
+        ),
+      );
     }
 
     const needsAdminPortal =

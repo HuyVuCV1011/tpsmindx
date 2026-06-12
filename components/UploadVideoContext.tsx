@@ -446,7 +446,7 @@ export const UploadVideoProvider = ({ children }: { children: React.ReactNode })
     <UploadContext.Provider value={{ uploadState, startUpload }}>
       {children}
       {uploadState.isUploading && (
-        <div className="fixed bottom-8 right-8 z-[9999] group flex flex-col items-end gap-3 transform transition-all duration-300">
+        <div className="fixed bottom-8 right-8 z-floating-status-custom group flex flex-col items-end gap-3 transform transition-all duration-300">
           {/* Card chi tiết (hiện khi hover) */}
           <div className="opacity-0 translate-y-3 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-300 w-[340px] bg-white shadow-[0_10px_40px_rgba(161,0,31,0.15)] border border-rose-100 rounded-2xl p-4 origin-bottom-right">
             <div className="flex flex-col gap-3">

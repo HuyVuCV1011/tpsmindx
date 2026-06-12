@@ -1,12 +1,17 @@
 'use client'
 
 import { useAuth } from '@/lib/auth-context'
+import {
+  appendSafeAuthRedirect,
+  buildLoginRedirectPath,
+  getBrowserPath,
+} from '@/lib/auth-redirect'
 import { filterManagementPermissions } from '@/lib/admin-permission-routes'
 import { authHeaders } from '@/lib/auth-headers'
 import { isUnauthorizedStatus, parseJsonSafe } from '@/lib/auth-error-handling'
 import { ArrowLeft, Mail, MessageCircle, ShieldAlert } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -33,6 +38,27 @@ export default function AppLayout({
   >('idle')
   const router = useRouter()
   const pathname = usePathname()
+  const getCurrentRequestedPath = useCallback(() => {
+    if (typeof window === 'undefined') return pathname
+    return getBrowserPath(window.location)
+  }, [pathname])
+  const getLoginRedirectPath = useCallback(() => {
+    if (redirectPath !== '/login' || typeof window === 'undefined') {
+      return redirectPath
+    }
+    return buildLoginRedirectPath(
+      getCurrentRequestedPath(),
+      window.location.origin,
+    )
+  }, [getCurrentRequestedPath, redirectPath])
+  const getDatasourceRedirectPath = useCallback(() => {
+    if (typeof window === 'undefined') return '/checkdatasource'
+    return appendSafeAuthRedirect(
+      '/checkdatasource',
+      getCurrentRequestedPath(),
+      window.location.origin,
+    )
+  }, [getCurrentRequestedPath])
 
   const hasRedirected = useRef(false)
   const latestUserRef = useRef(user)
@@ -87,7 +113,7 @@ export default function AppLayout({
       } catch {
         // Compatibility cache only.
       }
-      router.replace('/checkdatasource')
+      router.replace(getDatasourceRedirectPath())
       return
     }
     if (!needsTeacherDbCheck) {
@@ -123,7 +149,7 @@ export default function AppLayout({
           setTeacherGateBlocking(false)
           return
         }
-        router.replace('/checkdatasource')
+        router.replace(getDatasourceRedirectPath())
       } catch {
         if (cancelled) return
         setTeacherGateAllowUnknown(true)
@@ -139,6 +165,7 @@ export default function AppLayout({
     user?.email,
     router,
     token,
+    getDatasourceRedirectPath,
   ])
   const getRoutePermissionAliases = (path: string) => {
     if (path === '/admin/thu-vien-de') {
@@ -194,8 +221,7 @@ export default function AppLayout({
           if (!hasRedirected.current) {
             hasRedirected.current = true
             if (isUnauthorizedStatus(res.status)) {
-              logout()
-              router.replace(redirectPath)
+              logout(getLoginRedirectPath())
             } else {
               router.replace('/user/thong-tin-giao-vien')
             }
@@ -269,6 +295,7 @@ export default function AppLayout({
     router,
     redirectPath,
     updateUser,
+    getLoginRedirectPath,
   ])
 
   // Admin: làm mới quyền khi vào /admin — không gọi /api/check-admin mỗi lần đổi route con (throttle)
@@ -311,7 +338,7 @@ export default function AppLayout({
     // Redirect to login if authentication required but not authenticated
     if (requireAuth && !user && !hasRedirected.current) {
       hasRedirected.current = true
-      router.replace(redirectPath)
+      router.replace(getLoginRedirectPath())
       return
     }
 
@@ -405,6 +432,7 @@ export default function AppLayout({
     redirectPath,
     pathname,
     adminAccessState,
+    getLoginRedirectPath,
   ])
 
   // Xác minh định kỳ thay vì gọi lại ở mọi lần chuyển trang con. API nghiệp vụ

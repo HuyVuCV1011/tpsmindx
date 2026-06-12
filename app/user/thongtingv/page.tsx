@@ -14,6 +14,7 @@ import { PageLayout, PageLayoutContent } from '@/components/ui/page-layout'
 import { PageSkeleton } from '@/components/skeletons/PageSkeleton'
 import { SkeletonTable } from '@/components/skeletons/SkeletonTable'
 import { toast } from '@/lib/app-toast'
+import { buildBrowserLoginRedirectPath } from '@/lib/auth-redirect'
 import { useAuth } from '@/lib/auth-context'
 import { authHeaders } from '@/lib/auth-headers'
 import { lockBodyScroll, unlockBodyScroll } from '@/lib/body-scroll-lock'
@@ -582,7 +583,7 @@ export default function Page1() {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       localStorage.removeItem('refreshToken')
-      window.location.href = '/login'
+      window.location.href = buildBrowserLoginRedirectPath(window.location)
       throw new Error('Unauthorized')
     }
 
@@ -1015,7 +1016,7 @@ export default function Page1() {
           localStorage.removeItem('token')
           localStorage.removeItem('user')
           localStorage.removeItem('refreshToken')
-          window.location.href = '/login'
+          window.location.href = buildBrowserLoginRedirectPath(window.location)
           return
         }
 
@@ -2628,7 +2629,7 @@ export default function Page1() {
         {/* Modal - Chi tiết bài test */}
         {modalOpen && modalMonth && modalType && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+            className="fixed inset-0 z-modal-backdrop-custom flex items-center justify-center p-4 sm:p-6"
             onClick={() => setModalOpen(false)}
           >
             <div
@@ -2848,7 +2849,7 @@ export default function Page1() {
 
         {/* Registration Check Modal */}
         {registrationCheckModalOpen && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-modal-backdrop-custom p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[85vh] flex flex-col">
               <div className="bg-[#a1001f] text-white px-4 py-3 rounded-t-lg flex items-center justify-between">
                 <h3 className="font-semibold">Đăng ký kiểm tra</h3>
@@ -2932,7 +2933,7 @@ export default function Page1() {
 
         {/* Not Found Modal */}
         {notFoundModalOpen && (
-          <div className="fixed inset-0 backdrop-blur-xs bg-white/30 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 backdrop-blur-xs bg-white/30 flex items-center justify-center z-modal-backdrop-custom p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-fadeIn">
               <div className="p-6">
                 <div className="flex items-center justify-center w-16 h-16 mx-auto bg-red-100 rounded-full mb-4">
@@ -3046,7 +3047,7 @@ export default function Page1() {
         {/* Feedback Modal */}
         {false && feedbackModalOpen && (
           <div
-            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-modal-backdrop-custom p-4"
             onClick={(e) => {
               // Allow closing modal by clicking outside
               if (e.target === e.currentTarget) {
@@ -3174,7 +3175,7 @@ export default function Page1() {
 
         {/* Feedback Success Modal */}
         {false && feedbackSuccessModalOpen && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-modal-backdrop-custom p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-fadeIn">
               <div className="p-6 text-center">
                 <div className="flex items-center justify-center w-20 h-20 mx-auto bg-green-100 rounded-full mb-4">

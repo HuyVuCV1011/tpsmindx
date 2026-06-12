@@ -1,6 +1,7 @@
 "use client";
 
 import AppLayout from "@/components/AppLayout";
+import { getSafeNextFromBrowser } from "@/lib/auth-redirect";
 import { useAuth } from "@/lib/auth-context";
 import { authHeaders } from "@/lib/auth-headers";
 import { cn } from "@/lib/utils";
@@ -222,6 +223,10 @@ function CheckDataSourceContent() {
   const [submitting, setSubmitting] = useState(false);
   const [dropActive, setDropActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resolveRequestedDestination = useCallback((fallbackPath: string) => {
+    if (typeof window === "undefined") return fallbackPath;
+    return getSafeNextFromBrowser(window.location) || fallbackPath;
+  }, []);
 
   const userEmail = useMemo(() => (user?.email || "").trim().toLowerCase(), [user?.email]);
   const profileCompletion = useMemo(() => {
@@ -288,9 +293,11 @@ function CheckDataSourceContent() {
   useEffect(() => {
     if (!user) return;
     if (user.role !== "teacher") {
-      router.replace(user.isAdmin || ["super_admin", "admin", "manager"].includes(user.role)
-        ? "/admin/dashboard"
-        : "/user/truyenthong");
+      const fallbackPath =
+        user.isAdmin || ["super_admin", "admin", "manager"].includes(user.role)
+          ? "/admin/dashboard"
+          : "/user/truyenthong";
+      router.replace(resolveRequestedDestination(fallbackPath));
       return;
     }
 
@@ -315,7 +322,7 @@ function CheckDataSourceContent() {
             },
             token || "",
           );
-          router.replace("/user/truyenthong");
+          router.replace(resolveRequestedDestination("/user/truyenthong"));
           return;
         }
 
@@ -332,7 +339,7 @@ function CheckDataSourceContent() {
           } catch {
             /* compatibility cache only */
           }
-          router.replace("/user/truyenthong");
+          router.replace(resolveRequestedDestination("/user/truyenthong"));
           return;
         }
 
@@ -374,11 +381,19 @@ function CheckDataSourceContent() {
     };
 
     fetchTeacherByEmail();
-  }, [user, router, logout, userEmail, token, updateUser]);
+  }, [
+    user,
+    router,
+    logout,
+    userEmail,
+    token,
+    updateUser,
+    resolveRequestedDestination,
+  ]);
 
   const continueToApp = async () => {
     if (!user?.email) return;
-    const nextPath = "/user/truyenthong";
+    const nextPath = resolveRequestedDestination("/user/truyenthong");
     const teacherCode = (onboardingData?.["Code"] || user.email.split("@")[0]).toLowerCase().trim();
 
     try {

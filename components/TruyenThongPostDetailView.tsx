@@ -556,7 +556,7 @@ export function TruyenThongPostDetailView({ mode }: TruyenThongPostDetailViewPro
                                                                 <div key={r.type} className="relative group/icon cursor-pointer w-7 h-7 rounded-full bg-white border-2 border-white flex items-center justify-center shadow-md ring-1 ring-gray-100 hover:scale-125 hover:z-10 transition-transform duration-200" style={{ zIndex: 3 - i }}>
                                                                     <Icon className={`w-4 h-4 ${r.color}`} />
                                                                     {/* Tooltip: tên người thả cảm xúc này */}
-                                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-none z-[9999]
+                                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-none z-tooltip
                                                                         opacity-0 group-hover/icon:opacity-100
                                                                         translate-y-1 group-hover/icon:translate-y-0
                                                                         transition-all duration-150 ease-out">

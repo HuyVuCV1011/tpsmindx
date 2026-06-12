@@ -1531,7 +1531,7 @@ export default function ProfessionalEvaluationSchedulePage() {
       </Card>
 
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-modal-backdrop-custom flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-xl rounded-xl bg-white shadow-2xl h-[85vh] flex flex-col">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <h3 className="text-lg font-bold text-foreground">{editingEventId ? 'Cập nhật sự kiện' : 'Thêm mới sự kiện'}</h3>
@@ -2148,7 +2148,7 @@ export default function ProfessionalEvaluationSchedulePage() {
       )}
 
       {showDayEventsModal && selectedDate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-modal-backdrop-custom flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <h3 className="text-lg font-bold text-foreground">
@@ -2292,7 +2292,7 @@ export default function ProfessionalEvaluationSchedulePage() {
       )}
 
       {showParticipantsModal && selectedParticipantEvent && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-modal-raised-custom flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <div>
