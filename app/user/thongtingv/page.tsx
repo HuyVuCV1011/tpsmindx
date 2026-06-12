@@ -553,10 +553,25 @@ export default function Page1() {
     const token = localStorage.getItem('token')
 
     const doFetch = async (tok: string | null) => {
-      const headers: HeadersInit = {}
+      const headers: HeadersInit = {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
       if (tok) headers['Authorization'] = `Bearer ${tok}`
 
-      const res = await fetch(url, { headers, credentials: 'include' })
+      // Add timestamp to prevent caching
+      const urlWithTimestamp = url.includes('?') 
+        ? `${url}&_t=${Date.now()}`
+        : `${url}?_t=${Date.now()}`
+
+      console.log('🚀 Secure fetching:', urlWithTimestamp)
+
+      const res = await fetch(urlWithTimestamp, { 
+        headers, 
+        credentials: 'include',
+        cache: 'no-store'
+      })
       return res
     }
 
@@ -584,7 +599,9 @@ export default function Page1() {
       throw error
     }
 
-    return response.json()
+    const data = await response.json()
+    console.log('✅ Secure fetch response:', data)
+    return data
   }, [])
 
   // Tải profile: mặc định theo email đăng nhập; có nhập mã thì ?code= (một endpoint /api/checkdatasource/status)
@@ -657,11 +674,12 @@ export default function Page1() {
     isLoading: isLoadingScores,
     mutate: scoresMutate,
   } = useSWR(scoresUrl, secureFetcher, {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
-    dedupingInterval: 300000,
-    shouldRetryOnError: false,
-    revalidateIfStale: false,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+    dedupingInterval: 0,
+    shouldRetryOnError: true,
+    revalidateIfStale: true,
+    refreshInterval: 0,
   })
 
   const advancedTrainingUrl =
@@ -705,15 +723,27 @@ export default function Page1() {
 
   const mergedProfileBundle = useMemo(() => {
     if (!profileBundle) return undefined
+    
     const s = scoresBundle as
       | { success?: boolean; expertise?: unknown; experience?: unknown }
       | undefined
-    if (!s?.success) return profileBundle
-    return {
+      
+    console.log('📊 ProfileBundle:', profileBundle)
+    console.log('📊 ScoresBundle:', s)
+    
+    if (!s?.success) {
+      console.log('⚠️ Scores not successful, using profile bundle only')
+      return profileBundle
+    }
+    
+    const merged = {
       ...profileBundle,
       expertise: s.expertise ?? profileBundle.expertise,
       experience: s.experience ?? profileBundle.experience,
     }
+    
+    console.log('📊 Merged bundle:', merged)
+    return merged
   }, [profileBundle, scoresBundle])
 
   const teacherInfoData = useMemo(() => {
@@ -747,6 +777,12 @@ export default function Page1() {
     const trainingData = advancedTrainingData ?? null
     const expertiseData = bundle?.expertise?.monthlyData ?? []
     const experienceData = bundle?.experience?.monthlyData ?? []
+    
+    console.log('🔍 Computing scores data:')
+    console.log('  - Bundle:', bundle)
+    console.log('  - Expertise monthlyData:', expertiseData)
+    console.log('  - Experience monthlyData:', experienceData)
+    
     const scoresReady =
       !isLoadingProfile &&
       bundle !== undefined &&
@@ -755,6 +791,10 @@ export default function Page1() {
     const isLoadingTraining =
       isLoadingProfile ||
       Boolean(advancedTrainingUrl && isLoadingAdvancedTraining)
+      
+    console.log('📈 Scores ready:', scoresReady)
+    console.log('📈 Is loading scores:', isLoadingScores)
+    
     return {
       trainingData,
       expertiseData,
@@ -1090,6 +1130,14 @@ export default function Page1() {
       body: JSON.stringify({ action: 'visit' }),
     }).catch(() => {})
   }, [])
+
+  // Force refresh scores when scoresUrl becomes available
+  useEffect(() => {
+    if (scoresUrl && scoresMutate) {
+      console.log('🔄 Force refreshing scores data...')
+      scoresMutate()
+    }
+  }, [scoresUrl, scoresMutate])
 
   // Handle ESC key to close modals
   useEffect(() => {
@@ -1603,6 +1651,20 @@ export default function Page1() {
               className="border border-gray-200 rounded-xl p-3 sm:p-4 animate-fadeIn bg-white"
               style={{ animationDelay: '0.2s' }}
             >
+              {/* Debug button - remove in production */}
+              <div className="mb-3 flex justify-end">
+                <button
+                  onClick={async () => {
+                    console.log('🔄 Manual refresh triggered')
+                    console.log('ScoresUrl:', scoresUrl)
+                    await scoresMutate()
+                  }}
+                  className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  🔄 Refresh Scores
+                </button>
+              </div>
+              
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 items-end">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">

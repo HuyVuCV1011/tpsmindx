@@ -91,11 +91,16 @@ export async function insertExamRegistration(
   const id_de_thi = body.id_de_thi;
   const supplementaryRound = num(body.flow_round) ?? num((body as Record<string, unknown>).flowRound);
 
-  /** Khi không gắn lịch sự kiện (import CSV/Excel): lưu ngày giờ từ cột Lịch thi để GET không rơi về tao_luc (hôm nay). */
-  let lich_thi_dk: Date | null = null;
-  if (!id_su_kien) {
-    lich_thi_dk = parseIsoToDateOrNull(body.scheduled_at) ?? parseIsoToDateOrNull(body.open_at);
-  }
+  /**
+   * lich_thi_dk — thời gian thi thực tế (ngày/giờ bắt đầu bài thi):
+   *   - Khi có event (id_su_kien): lấy từ open_at / scheduled_at (= event.startAt)
+   *   - Khi import CSV (không có event): lấy từ scheduled_at / open_at trong body
+   * Luôn lưu để có thể fallback tính thang_dk/nam_dk và hiển thị đúng thời gian.
+   */
+  const lich_thi_dk: Date | null =
+    parseIsoToDateOrNull(body.open_at) ??
+    parseIsoToDateOrNull(body.scheduled_at) ??
+    null;
 
   let thang_dk = num(body.thang_dk ?? body.month);
   let nam_dk = num(body.nam_dk ?? body.year);
@@ -117,7 +122,13 @@ export async function insertExamRegistration(
   const xuLyNormalized = normalizeXuLyDiemForImport(body.xu_ly_diem);
   const diemResolved = resolveDiemForImport(body.diem ?? body.score, xuLyNormalized);
 
-  const dangKyRaw = body.dang_ky_luc ?? body.ngay_dang_ky;
+  /**
+   * dang_ky_luc — thời điểm user bấm đăng ký (thời gian thực):
+   *   - Import CSV/Excel: lấy từ body.dang_ky_luc / body.ngay_dang_ky nếu có
+   *   - Đăng ký qua frontend: luôn là NOW() (không cho phép override)
+   */
+  const isFromImport = !!(body.dang_ky_luc ?? body.ngay_dang_ky ?? body.source_form === 'import');
+  const dangKyRaw = isFromImport ? (body.dang_ky_luc ?? body.ngay_dang_ky) : null;
   let dangKyResolved: Date | null = null;
   if (dangKyRaw !== undefined && dangKyRaw !== null && String(dangKyRaw).trim() !== "") {
     dangKyResolved = parseNgayDangKyImportFormat(dangKyRaw);

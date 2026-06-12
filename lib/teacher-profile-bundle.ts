@@ -1,4 +1,4 @@
-import type { Pool } from "pg";
+﻿import type { Pool } from "pg";
 
 const LEGACY_QUOTED_KEYS_SUPERSEDED_BY_SNAKE_CASE = new Set([
   "Full name",
@@ -169,7 +169,10 @@ export async function fetchExpertiseBundleByCode(
   const client = await pool.connect();
   try {
     const codeAliases = collectTeacherCodeAliases(code, alternateCodes);
+    console.log('🔍 Fetching expertise for:', { code, alternateCodes, codeAliases });
+    
     if (codeAliases.length === 0) {
+      console.log('⚠️ No code aliases found');
       return {
         records: [],
         monthlyData: [],
@@ -187,14 +190,19 @@ export async function fetchExpertiseBundleByCode(
          r.co_so_lam_viec     AS branch,
          r.ma_giao_vien       AS code,
          r.hinh_thuc          AS type,
-         r.thang_dk           AS month,
-         r.nam_dk             AS year,
+         -- Ưu tiên lich_thi_dk nếu có (chính xác nhất); fallback sang thang_dk/nam_dk, cuối cùng là tao_luc
+         COALESCE(EXTRACT(MONTH FROM r.lich_thi_dk)::int, r.thang_dk, EXTRACT(MONTH FROM r.tao_luc)::int) AS month,
+         COALESCE(EXTRACT(YEAR  FROM r.lich_thi_dk)::int, r.nam_dk,   EXTRACT(YEAR  FROM r.tao_luc)::int) AS year,
          r.dot                AS batch,
          r.thoi_gian_kiem_tra AS time,
          r.cau_dung           AS correct,
          r.diem               AS score,
          r.email_giai_trinh   AS email_explanation,
          r.xu_ly_diem         AS processing,
+         r.lich_thi_dk,
+         r.thang_dk,
+         r.nam_dk,
+         r.tao_luc,
          EXISTS (
            SELECT 1 FROM chuyen_sau_giaitrinh g
            WHERE g.id_ket_qua = r.id
@@ -203,12 +211,18 @@ export async function fetchExpertiseBundleByCode(
          ) AS has_accepted_explanation
        FROM chuyen_sau_results r
        LEFT JOIN chuyen_sau_monhoc mh ON mh.id = r.id_mon
-       WHERE r.thang_dk IS NOT NULL
-         AND r.nam_dk IS NOT NULL
-         AND LOWER(TRIM(COALESCE(r.ma_giao_vien, ''))) = ANY($1::text[])
-       ORDER BY r.nam_dk DESC, r.thang_dk DESC`,
+       WHERE r.diem IS NOT NULL
+         AND r.xu_ly_diem IS NOT NULL  -- chỉ lấy bài đã xử lý (đã thi hoặc chờ giải trình)
+         AND (
+           LOWER(TRIM(COALESCE(r.ma_giao_vien, ''))) = ANY($1::text[])
+           OR LOWER(TRIM(SPLIT_PART(COALESCE(r.dia_chi_email, ''), '@', 1))) = ANY($1::text[])
+         )
+       ORDER BY year DESC, month DESC`,
       [codeAliases]
     );
+
+    console.log('📊 Raw query result rows:', result.rows.length);
+    console.log('📊 Sample rows:', result.rows.slice(0, 3));
 
     type TestRecord = {
       area: string;
@@ -240,8 +254,10 @@ export async function fetchExpertiseBundleByCode(
 
     const records: TestRecord[] = result.rows.map((row: Record<string, unknown>) => {
       const score = parseFloat(String(row.score ?? "0")) || 0;
-      const didNotSubmit = row.processing !== "đã hoàn thành";
-      const isCountedInAverage = !(didNotSubmit && row.has_accepted_explanation);
+      // Tính vào trung bình nếu có điểm thực > 0, HOẶC chưa submit nhưng không được miễn
+      // Tính vào trung bình nếu chưa được miễn bởi giải trình đã duyệt
+      // Bài thi 0 điểm chưa giải trình vẫn tính 0, bài được miễn thì bỏ qua
+      const isCountedInAverage = !row.has_accepted_explanation;
       const m = parseInt(String(row.month ?? "").trim(), 10);
       const y = parseInt(String(row.year ?? "").trim(), 10);
       const dateStr =
@@ -269,6 +285,15 @@ export async function fetchExpertiseBundleByCode(
       };
     });
 
+    console.log('📊 Processed records:', records.length);
+    console.log('📊 Recent records:', records.slice(0, 5).map(r => ({
+      subject: r.subject,
+      date: r.date,
+      score: r.score,
+      type: r.type,
+      isCountedInAverage: r.isCountedInAverage
+    })));
+
     const monthlyMap = new Map<string, TestRecord[]>();
     records.forEach((record) => {
       if (!monthlyMap.has(record.date)) monthlyMap.set(record.date, []);
@@ -277,11 +302,58 @@ export async function fetchExpertiseBundleByCode(
 
     const monthlyData: MonthlyAverage[] = [];
     monthlyMap.forEach((monthRecords, month) => {
-      const countedRecords = monthRecords.filter((r) => r.isCountedInAverage);
-      if (countedRecords.length > 0) {
-        const sum = countedRecords.reduce((acc, r) => acc + parseFloat(r.score), 0);
-        const average = sum / countedRecords.length;
-        monthlyData.push({ month, average, count: countedRecords.length, records: monthRecords });
+      // Nhóm theo môn học trong tháng — cùng công thức với /api/rawdata
+      const subjectMap = new Map<string, TestRecord[]>();
+      monthRecords.forEach((r) => {
+        const subjectKey = r.subject || '__unknown__';
+        if (!subjectMap.has(subjectKey)) subjectMap.set(subjectKey, []);
+        subjectMap.get(subjectKey)!.push(r);
+      });
+
+      let totalCombinedScore = 0;
+      let subjectCount = 0;
+
+      subjectMap.forEach((subjectRecords) => {
+        // Chỉ tính môn có ít nhất một record được tính vào trung bình
+        if (!subjectRecords.some((r) => r.isCountedInAverage)) return;
+
+        let officialScore = 0;
+        let supplementScore = 0;
+        let hasOfficial = false;
+        let hasSupplement = false;
+
+        subjectRecords.forEach((r) => {
+          if (!r.isCountedInAverage) return;
+          const typeLower = (r.type || '').toLowerCase();
+          const isSupplement =
+            typeLower.includes('bổ sung') ||
+            typeLower.includes('bo sung') ||
+            typeLower === 'additional';
+          const score = parseFloat(r.score);
+          if (isSupplement) {
+            supplementScore = score;
+            hasSupplement = true;
+          } else {
+            officialScore = score;
+            hasOfficial = true;
+          }
+        });
+
+        // Công thức: (chính thức + bổ sung) / 2 nếu có cả hai, ngược lại lấy điểm có sẵn
+        const combinedScore =
+          hasOfficial && hasSupplement
+            ? (officialScore + supplementScore) / 2
+            : hasSupplement
+              ? supplementScore
+              : officialScore;
+
+        totalCombinedScore += combinedScore;
+        subjectCount++;
+      });
+
+      if (subjectCount > 0) {
+        const average = totalCombinedScore / subjectCount;
+        monthlyData.push({ month, average, count: subjectCount, records: monthRecords });
       } else {
         monthlyData.push({ month, average: 0, count: 0, records: monthRecords });
       }
