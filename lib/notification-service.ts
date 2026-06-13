@@ -110,12 +110,16 @@ export async function createNotificationForEveryone(payload: Omit<NotificationPa
 export async function sendEmailNotification(type: string, data: Record<string, unknown>): Promise<void> {
   try {
     const baseUrl = getPublicBaseUrl();
+    const internalSecret =
+      process.env.INTERNAL_API_SECRET ||
+      process.env.EMAIL_INTERNAL_API_SECRET ||
+      '';
     await fetch(`${baseUrl}/api/emails`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(process.env.INTERNAL_API_SECRET
-          ? { 'x-internal-api-secret': process.env.INTERNAL_API_SECRET }
+        ...(internalSecret
+          ? { 'x-internal-api-secret': internalSecret }
           : {}),
       },
       body: JSON.stringify({ type, data }),

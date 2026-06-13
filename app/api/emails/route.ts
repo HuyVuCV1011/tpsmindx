@@ -159,6 +159,8 @@ export async function POST(request: NextRequest) {
         cc: cc.length > 0 ? cc : undefined,
         subject: `[MindX | THÔNG BÁO XIN NGHỈ 1 BUỔI] Đã duyệt & GV thay đã xác nhận — ${d.teacher_name}`,
         html,
+        emailType: 'leave_approved_substitute_confirmed',
+        source: 'app/api/emails',
       });
 
       return NextResponse.json({
@@ -204,6 +206,8 @@ export async function POST(request: NextRequest) {
         cc: cc.length > 0 ? cc : undefined,
         subject: `[MindX | Xin nghỉ 1 buổi] Yêu cầu không được duyệt — ${d.teacher_name}`,
         html,
+        emailType: 'leave_admin_rejected',
+        source: 'app/api/emails',
       });
 
       return NextResponse.json({

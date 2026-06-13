@@ -38,6 +38,11 @@ import pool from '@/lib/db';
 import { createNotification } from '@/lib/notification-service';
 import { NextRequest, NextResponse } from 'next/server';
 
+const EMAIL_INTERNAL_SECRET =
+  process.env.INTERNAL_API_SECRET ||
+  process.env.EMAIL_INTERNAL_API_SECRET ||
+  '';
+
 type LeaveStatus =
   | 'pending_admin'
   | 'approved_unassigned'
@@ -687,8 +692,8 @@ export async function PATCH(request: NextRequest) {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                ...(process.env.INTERNAL_API_SECRET
-                  ? { 'x-internal-api-secret': process.env.INTERNAL_API_SECRET }
+                ...(EMAIL_INTERNAL_SECRET
+                  ? { 'x-internal-api-secret': EMAIL_INTERNAL_SECRET }
                   : {}),
               },
               body: JSON.stringify({
@@ -1372,8 +1377,8 @@ export async function PATCH(request: NextRequest) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(process.env.INTERNAL_API_SECRET
-              ? { 'x-internal-api-secret': process.env.INTERNAL_API_SECRET }
+            ...(EMAIL_INTERNAL_SECRET
+              ? { 'x-internal-api-secret': EMAIL_INTERNAL_SECRET }
               : {}),
           },
           body: JSON.stringify({
