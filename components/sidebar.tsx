@@ -16,6 +16,7 @@ import {
   GraduationCap,
   Home,
   LogOut,
+  Mail,
   Megaphone,
   Menu,
   Settings,
@@ -269,6 +270,7 @@ export function Sidebar() {
         { href: '/admin/database', label: 'Database Manager' },
         { href: '/admin/cloudinary', label: 'Cloudinary Manager' },
         { href: '/admin/s3-supabase-manager', label: 'S3 Supabase Manager' },
+        { href: '/admin/email-monitor', label: 'Giám sát Email', icon: Mail },
       ],
     },
     {
