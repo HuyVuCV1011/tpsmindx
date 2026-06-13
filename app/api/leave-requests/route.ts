@@ -33,15 +33,21 @@ import {
   stripSubstituteDeclineAuditFromAdminNote,
   withAdminNoteRedactedForTeacherView,
 } from '@/lib/leave-request-admin-note-sanitize';
-import { getPublicBaseUrl } from '@/lib/public-base-url';
 import pool from '@/lib/db';
+import {
+  sendLeaveAdminRejectedEmail,
+  sendLeaveRequestSubmittedEmail,
+  sendLeaveSubstituteConfirmedEmail,
+} from '@/lib/leave-request-emails';
 import { createNotification } from '@/lib/notification-service';
 import { NextRequest, NextResponse } from 'next/server';
+import type { PoolClient } from 'pg';
 
-const EMAIL_INTERNAL_SECRET =
-  process.env.INTERNAL_API_SECRET ||
-  process.env.EMAIL_INTERNAL_API_SECRET ||
-  '';
+/** Trả connection trước khi gửi mail/thông báo — tránh deadlock pool (dev max=1). */
+function releaseLeaveDbClient(client: PoolClient | undefined): undefined {
+  if (client) client.release();
+  return undefined;
+}
 
 type LeaveStatus =
   | 'pending_admin'
@@ -560,6 +566,40 @@ export async function POST(request: NextRequest) {
 
     const result = await client.query(insertQuery, values);
     const newRequest = result.rows[0];
+    client = releaseLeaveDbClient(client);
+
+    await sendLeaveRequestSubmittedEmail(
+      {
+        request_id: String(newRequest.id),
+        teacher_name: String(newRequest.teacher_name ?? teacher_name),
+        teacher_email: String(newRequest.email ?? email).trim(),
+        campus: String(newRequest.campus ?? campus),
+        campus_bu_email: campusBuEmailDb || undefined,
+        email_subject: email_subject || undefined,
+        class_code: String(newRequest.class_code ?? trimmedClassCode),
+        leave_date:
+          newRequest.leave_date != null
+            ? String(newRequest.leave_date)
+            : String(leave_date),
+        class_time: String(newRequest.class_time ?? trimmedClassTime),
+        leave_session: String(newRequest.leave_session ?? trimmedLeaveSession),
+        student_count: String(newRequest.student_count ?? normalizedStudentCount),
+        reason: String(newRequest.reason ?? reason),
+        class_status:
+          newRequest.class_status != null
+            ? String(newRequest.class_status)
+            : class_status || undefined,
+        substitute_teacher:
+          normalizedHasSubstitute && substitute_teacher
+            ? String(substitute_teacher).trim()
+            : undefined,
+        substitute_email:
+          normalizedHasSubstitute && substitute_email
+            ? String(substitute_email).trim()
+            : undefined,
+      },
+      { action: 'create', initiatedBy: String(email).trim() },
+    );
 
     // Gửi thông báo trong app cho GV xin nghỉ
     await createNotification({
@@ -684,71 +724,60 @@ export async function PATCH(request: NextRequest) {
         }
 
         const rejectedRow = rejectedResult.rows[0] as Record<string, unknown>;
+        client = releaseLeaveDbClient(client);
 
-        try {
-          await fetch(
-            `${getPublicBaseUrl()}/api/emails`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(EMAIL_INTERNAL_SECRET
-                  ? { 'x-internal-api-secret': EMAIL_INTERNAL_SECRET }
-                  : {}),
-              },
-              body: JSON.stringify({
-                type: 'leave_admin_rejected',
-                data: {
-                  request_id: String(rejectedRow.id ?? id),
-                  teacher_name: String(rejectedRow.teacher_name ?? ''),
-                  teacher_email: String(rejectedRow.email ?? '').trim() || undefined,
-                  campus:
-                    rejectedRow.campus != null
-                      ? String(rejectedRow.campus)
-                      : undefined,
-                  class_code:
-                    rejectedRow.class_code != null
-                      ? String(rejectedRow.class_code)
-                      : undefined,
-                  leave_date:
-                    rejectedRow.leave_date != null
-                      ? String(rejectedRow.leave_date)
-                      : undefined,
-                  class_time:
-                    rejectedRow.class_time != null
-                      ? String(rejectedRow.class_time)
-                      : undefined,
-                  leave_session:
-                    rejectedRow.leave_session != null
-                      ? String(rejectedRow.leave_session)
-                      : undefined,
-                  reason:
-                    rejectedRow.reason != null
-                      ? String(rejectedRow.reason)
-                      : undefined,
-                  admin_note:
-                    rejectedRow.admin_note != null
-                      ? String(rejectedRow.admin_note)
-                      : undefined,
-                  admin_name:
-                    rejectedRow.admin_name != null
-                      ? String(rejectedRow.admin_name)
-                      : undefined,
-                  admin_email:
-                    rejectedRow.admin_email != null
-                      ? String(rejectedRow.admin_email)
-                      : undefined,
-                  campus_bu_email:
-                    rejectedRow.campus_bu_email != null
-                      ? String(rejectedRow.campus_bu_email).trim() || undefined
-                      : undefined,
-                },
-              }),
-            },
-          );
-        } catch (mailError) {
-          console.error('leave-requests admin_review reject email error:', mailError);
-        }
+        await sendLeaveAdminRejectedEmail(
+          {
+            request_id: String(rejectedRow.id ?? id),
+            teacher_name: String(rejectedRow.teacher_name ?? ''),
+            teacher_email: String(rejectedRow.email ?? '').trim() || undefined,
+            campus:
+              rejectedRow.campus != null
+                ? String(rejectedRow.campus)
+                : undefined,
+            class_code:
+              rejectedRow.class_code != null
+                ? String(rejectedRow.class_code)
+                : undefined,
+            leave_date:
+              rejectedRow.leave_date != null
+                ? String(rejectedRow.leave_date)
+                : undefined,
+            class_time:
+              rejectedRow.class_time != null
+                ? String(rejectedRow.class_time)
+                : undefined,
+            leave_session:
+              rejectedRow.leave_session != null
+                ? String(rejectedRow.leave_session)
+                : undefined,
+            reason:
+              rejectedRow.reason != null
+                ? String(rejectedRow.reason)
+                : undefined,
+            admin_note:
+              rejectedRow.admin_note != null
+                ? String(rejectedRow.admin_note)
+                : undefined,
+            admin_name:
+              rejectedRow.admin_name != null
+                ? String(rejectedRow.admin_name)
+                : undefined,
+            admin_email:
+              rejectedRow.admin_email != null
+                ? String(rejectedRow.admin_email)
+                : undefined,
+            campus_bu_email:
+              rejectedRow.campus_bu_email != null
+                ? String(rejectedRow.campus_bu_email).trim() || undefined
+                : undefined,
+          },
+          {
+            action: 'admin_review',
+            decision: 'rejected',
+            initiatedBy: sessionAdminEmail,
+          },
+        );
 
         // Gửi thông báo trong app
         await createNotification({
@@ -793,6 +822,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       const approvedRow = approvedResult.rows[0];
+      client = releaseLeaveDbClient(client);
 
       // Gửi thông báo trong app cho GV xin nghỉ
       await createNotification({
@@ -1237,6 +1267,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       const assignedRow = assignResult.rows[0];
+      client = releaseLeaveDbClient(client);
 
       // Gửi thông báo trong app cho GV được phân công dạy thay
       if (assignedRow.substitute_email) {
@@ -1371,43 +1402,35 @@ export async function PATCH(request: NextRequest) {
       }
 
       const confirmedRow = confirmResult.rows[0];
+      client = releaseLeaveDbClient(client);
 
-      try {
-        await fetch(`${getPublicBaseUrl()}/api/emails`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(EMAIL_INTERNAL_SECRET
-              ? { 'x-internal-api-secret': EMAIL_INTERNAL_SECRET }
-              : {}),
-          },
-          body: JSON.stringify({
-            type: 'leave_approved_substitute_confirmed',
-            data: {
-              teacher_name: confirmedRow.teacher_name,
-              teacher_email: confirmedRow.email,
-              campus: confirmedRow.campus,
-              class_code: confirmedRow.class_code,
-              leave_date: confirmedRow.leave_date,
-              class_time: confirmedRow.class_time,
-              leave_session: confirmedRow.leave_session,
-              substitute_teacher: confirmedRow.substitute_teacher,
-              substitute_email: confirmedRow.substitute_email,
-              reason: confirmedRow.reason,
-              admin_note: confirmedRow.admin_note,
-              admin_name: confirmedRow.admin_name,
-              admin_email: confirmedRow.admin_email,
-              substitute_confirmed_at: confirmedRow.substitute_confirmed_at,
-              campus_bu_email:
-                confirmedRow.campus_bu_email != null
-                  ? String(confirmedRow.campus_bu_email).trim() || undefined
-                  : undefined,
-            },
-          }),
-        });
-      } catch (mailError) {
-        console.error('leave-requests substitute_confirm email error:', mailError);
-      }
+      await sendLeaveSubstituteConfirmedEmail(
+        {
+          teacher_name: confirmedRow.teacher_name,
+          teacher_email: confirmedRow.email,
+          campus: confirmedRow.campus,
+          class_code: confirmedRow.class_code,
+          leave_date: confirmedRow.leave_date,
+          class_time: confirmedRow.class_time,
+          leave_session: confirmedRow.leave_session,
+          substitute_teacher: confirmedRow.substitute_teacher,
+          substitute_email: confirmedRow.substitute_email,
+          reason: confirmedRow.reason,
+          admin_note: confirmedRow.admin_note,
+          admin_name: confirmedRow.admin_name,
+          admin_email: confirmedRow.admin_email,
+          substitute_confirmed_at: confirmedRow.substitute_confirmed_at,
+          campus_bu_email:
+            confirmedRow.campus_bu_email != null
+              ? String(confirmedRow.campus_bu_email).trim() || undefined
+              : undefined,
+        },
+        {
+          action: 'substitute_confirm',
+          requestId: String(confirmedRow.id ?? id),
+          initiatedBy: auth.sessionEmail,
+        },
+      );
 
       // Gửi thông báo trong app cho GV xin nghỉ
       await createNotification({
@@ -1502,6 +1525,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       const declined = declineResult.rows[0] as Record<string, unknown>;
+      client = releaseLeaveDbClient(client);
       const outDeclined = auth.privileged
         ? declined
         : {
