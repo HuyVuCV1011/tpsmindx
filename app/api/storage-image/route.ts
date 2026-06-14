@@ -1,7 +1,12 @@
 import { requireCandidateSession } from '@/lib/candidate-session';
 import { requireBearerSession } from '@/lib/datasource-api-auth';
 import { clientIpFromRequest, rateLimitOr429Async } from '@/lib/rate-limit-memory';
-import { createSupabaseS3Client, isSupabaseS3Configured } from '@/lib/supabase-s3';
+import {
+  createSupabaseS3Client,
+  getPublicObjectUrl,
+  getSignedObjectUrl,
+  isSupabaseS3Configured,
+} from '@/lib/supabase-s3';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -9,15 +14,48 @@ const ANONYMOUS_READ_BUCKETS = new Set([
   'mindx-posts-content',
   'mindx-thumbnails',
 ]);
+const SIGNED_REDIRECT_BUCKET_TTLS = new Map<string, number>([
+  ['mindx-posts-content', 12 * 60 * 60],
+  ['mindx-thumbnails', 12 * 60 * 60],
+  ['mindx-question-images', 60 * 60],
+  ['mindx-videos', 30 * 60],
+]);
+const DEFAULT_SIGNED_REDIRECT_TTL = 15 * 60;
 
 function parseStorageUrl(rawUrl: string): { bucket: string; key: string } | null {
-  const match = rawUrl.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/);
-  if (!match) return null;
-  return { bucket: match[1], key: match[2] };
+  try {
+    const parsed = new URL(rawUrl);
+    const match = parsed.pathname.match(
+      /\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+)$/,
+    );
+    if (!match) return null;
+    return {
+      bucket: decodeURIComponent(match[1]),
+      key: decodeURIComponent(match[2]),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function isSafeObjectKey(key: string): boolean {
   return Boolean(key) && !key.includes('..') && !key.startsWith('/');
+}
+
+function redirectToObjectUrl(url: string, bucket: string, ttlSeconds?: number) {
+  const isAnonymousBucket = ANONYMOUS_READ_BUCKETS.has(bucket);
+  const sharedMaxAge = ttlSeconds
+    ? Math.max(60, ttlSeconds - 5 * 60)
+    : 7 * 24 * 60 * 60;
+  const response = NextResponse.redirect(url, 307);
+  response.headers.set(
+    'Cache-Control',
+    isAnonymousBucket
+      ? `public, max-age=${sharedMaxAge}, s-maxage=${sharedMaxAge}, stale-while-revalidate=300`
+      : 'private, max-age=300',
+  );
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  return response;
 }
 
 async function requireReadAccess(
@@ -49,10 +87,6 @@ export async function GET(request: NextRequest) {
     const rl = await rateLimitOr429Async(`storage-image:${clientIpFromRequest(request)}`, 300, 60_000);
     if (rl) return rl;
 
-    if (!isSupabaseS3Configured()) {
-      return new NextResponse('Storage not configured', { status: 500 });
-    }
-
     const { searchParams } = new URL(request.url);
     bucket = searchParams.get('bucket');
     key = searchParams.get('key');
@@ -72,6 +106,27 @@ export async function GET(request: NextRequest) {
 
     const denied = await requireReadAccess(request, bucket, key);
     if (denied) return denied;
+
+    if (!isSupabaseS3Configured()) {
+      if (ANONYMOUS_READ_BUCKETS.has(bucket)) {
+        return redirectToObjectUrl(getPublicObjectUrl(bucket, key), bucket);
+      }
+      return new NextResponse('Storage not configured', { status: 500 });
+    }
+
+    // Keep legacy proxy=1 URLs working, but prefer direct storage delivery.
+    // stream=1 is reserved for diagnostics when signed URLs are unavailable.
+    const forceStream = searchParams.get('stream') === '1';
+    if (!forceStream) {
+      const signedRedirectTtl =
+        SIGNED_REDIRECT_BUCKET_TTLS.get(bucket) ?? DEFAULT_SIGNED_REDIRECT_TTL;
+      try {
+        const objectUrl = await getSignedObjectUrl(bucket, key, signedRedirectTtl);
+        return redirectToObjectUrl(objectUrl, bucket, signedRedirectTtl);
+      } catch (error: any) {
+        console.warn('[storage-proxy] direct redirect failed, fallback to proxy stream:', error?.message || error);
+      }
+    }
 
     const isVideo = /\.(mp4|webm|ogg|mov|avi|mkv)$/i.test(key);
     const rangeHeader = request.headers.get('range');
@@ -123,4 +178,3 @@ export async function GET(request: NextRequest) {
     return new NextResponse('Not found', { status: 404 });
   }
 }
-

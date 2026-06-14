@@ -1,6 +1,7 @@
 "use client";
 
 import AppLayout from "@/components/AppLayout";
+import { getSafeNextFromBrowser } from "@/lib/auth-redirect";
 import { useAuth } from "@/lib/auth-context";
 import { authHeaders } from "@/lib/auth-headers";
 import { cn } from "@/lib/utils";
@@ -213,7 +214,7 @@ async function triggerScoreImportIfNeeded(teacherCode: string, token: string | n
 }
 
 function CheckDataSourceContent() {
-  const { user, logout, token } = useAuth();
+  const { user, logout, token, updateUser } = useAuth();
   const router = useRouter();
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -222,6 +223,10 @@ function CheckDataSourceContent() {
   const [submitting, setSubmitting] = useState(false);
   const [dropActive, setDropActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resolveRequestedDestination = useCallback((fallbackPath: string) => {
+    if (typeof window === "undefined") return fallbackPath;
+    return getSafeNextFromBrowser(window.location) || fallbackPath;
+  }, []);
 
   const userEmail = useMemo(() => (user?.email || "").trim().toLowerCase(), [user?.email]);
   const profileCompletion = useMemo(() => {
@@ -288,9 +293,11 @@ function CheckDataSourceContent() {
   useEffect(() => {
     if (!user) return;
     if (user.role !== "teacher") {
-      router.replace(user.isAdmin || ["super_admin", "admin", "manager"].includes(user.role)
-        ? "/admin/dashboard"
-        : "/user/truyenthong");
+      const fallbackPath =
+        user.isAdmin || ["super_admin", "admin", "manager"].includes(user.role)
+          ? "/admin/dashboard"
+          : "/user/truyenthong";
+      router.replace(resolveRequestedDestination(fallbackPath));
       return;
     }
 
@@ -301,45 +308,55 @@ function CheckDataSourceContent() {
           ...authHeaders(token),
         };
 
-        // Run both requests in parallel:
-        // - DB first for reliability after user has been synced.
-        // - Sheets to support onboarding sync source when available.
-        const [dbResult, sheetResult] = await Promise.allSettled([
-          fetch(`/api/teachers/info?email=${encodeURIComponent(user.email)}`, { headers }),
-          fetch(`/api/teachers?email=${encodeURIComponent(user.email)}&basic=true`, { headers }),
-        ]);
+        const statusResponse = await fetch(
+          `/api/checkdatasource/status?email=${encodeURIComponent(user.email)}&brief=1`,
+          { cache: "no-store", headers },
+        );
+        const statusData = await statusResponse.json().catch(() => null);
 
-        let dbData: any = null;
-        if (dbResult.status === "fulfilled" && dbResult.value.ok) {
-          dbData = await dbResult.value.json().catch(() => null);
-          if (dbData?.success && dbData?.teacher) {
-            // Đã có hồ sơ trong bảng teachers — kiểm tra thêm điểm đào tạo nâng cao.
-            // Nếu giáo viên chưa có điểm thì trigger import trước khi redirect,
-            // tránh trường hợp HR nhập tay teachers nhưng điểm chưa được sync.
-            const teacherCode = (
-              dbData.teacher?.code ||
-              dbData.teacher?.["Code"] ||
-              user.email.split("@")[0]
-            ).toLowerCase().trim();
-
-            try {
-              await triggerScoreImportIfNeeded(teacherCode, token);
-            } catch {
-              // Non-fatal — không block user vào app
-            }
-
-            try {
-              localStorage.setItem("tps_profile_check_done_email", userEmail);
-            } catch {
-              /* ignore */
-            }
-            router.replace("/user/truyenthong");
-            return;
-          }
+        if (statusResponse.ok && statusData?.success && statusData.dbUnavailable) {
+          updateUser(
+            {
+              ...user,
+              teacherSync: { foundInDatabase: false, dbUnavailable: true },
+            },
+            token || "",
+          );
+          router.replace(resolveRequestedDestination("/user/truyenthong"));
+          return;
         }
 
-        if (sheetResult.status === "fulfilled" && sheetResult.value.ok) {
-          const sheetData = await sheetResult.value.json().catch(() => null);
+        if (statusResponse.ok && statusData?.success && statusData.exists === true) {
+          updateUser(
+            {
+              ...user,
+              teacherSync: { foundInDatabase: true, dbUnavailable: false },
+            },
+            token || "",
+          );
+          try {
+            localStorage.setItem("tps_profile_check_done_email", userEmail);
+          } catch {
+            /* compatibility cache only */
+          }
+          router.replace(resolveRequestedDestination("/user/truyenthong"));
+          return;
+        }
+
+        if (!statusResponse.ok || statusData?.success !== true) {
+          setOnboardingData(null);
+          return;
+        }
+
+        // The brief database check above is authoritative. Only confirmed
+        // missing teachers continue to the slower Google Sheets lookup.
+        const sheetResponse = await fetch(
+          `/api/teachers?email=${encodeURIComponent(user.email)}&basic=true`,
+          { headers },
+        );
+
+        if (sheetResponse.ok) {
+          const sheetData = await sheetResponse.json().catch(() => null);
           if (sheetData?.onboardingData && Object.keys(sheetData.onboardingData).length > 0) {
             setOnboardingData(sheetData.onboardingData as OnboardingData);
             return;
@@ -364,11 +381,19 @@ function CheckDataSourceContent() {
     };
 
     fetchTeacherByEmail();
-  }, [user, router, logout, userEmail, token]);
+  }, [
+    user,
+    router,
+    logout,
+    userEmail,
+    token,
+    updateUser,
+    resolveRequestedDestination,
+  ]);
 
   const continueToApp = async () => {
     if (!user?.email) return;
-    const nextPath = "/user/truyenthong";
+    const nextPath = resolveRequestedDestination("/user/truyenthong");
     const teacherCode = (onboardingData?.["Code"] || user.email.split("@")[0]).toLowerCase().trim();
 
     try {
@@ -400,6 +425,16 @@ function CheckDataSourceContent() {
       }
       // Mark profile as done so AppLayout guard allows /user/* access
       localStorage.setItem("tps_profile_check_done_email", userEmail);
+      updateUser(
+        {
+          ...user,
+          teacherSync: {
+            foundInDatabase: !data.dbUnavailable,
+            dbUnavailable: Boolean(data.dbUnavailable),
+          },
+        },
+        token || "",
+      );
 
       // ── Import điểm đào tạo nâng cao từ Google Sheet (nếu chưa có) ──────────
       // Dùng isNewTeacher từ confirm API (đã được tính dựa trên trạng thái điểm thực tế,
@@ -417,6 +452,13 @@ function CheckDataSourceContent() {
       console.warn("checkdatasource confirm failed:", message);
       // Still set localStorage so user can proceed even if DB had transient issue
       localStorage.setItem("tps_profile_check_done_email", userEmail);
+      updateUser(
+        {
+          ...user,
+          teacherSync: { foundInDatabase: false, dbUnavailable: true },
+        },
+        token || "",
+      );
     }
 
     router.replace(nextPath);

@@ -57,13 +57,12 @@ const getFallbackPageTitle = (path: string) => {
 // ─── Mascot walking component ────────────────────────────────────────────────
 function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: () => void }) {
   const [hovered, setHovered] = useState(false)
-  const [bubble, setBubble] = useState(false)
-  const hoveredRef = useRef(false)  // RAF reads this directly — no stale closure
 
   // Refs for direct DOM manipulation to bypass React renders
   const wrapperRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imagesRef = useRef<globalThis.Map<string, HTMLImageElement>>(new globalThis.Map())
+  const hoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // All mutable animation state lives in ONE ref — no stale closure issues
   const s = useRef({
@@ -75,18 +74,17 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
     lastPosTime: 0,
     rafId: 0,
     jumpTimer: 0,
-    bubbleTimer: 0,
     turnCount: 0,
     pausedPhase: null as 'walk' | 'jump' | 'turn' | null,
     pausedPosX: 0,
     isHidden: false,
   })
 
-  const bubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Sync hoveredRef immediately (no useEffect delay)
-  const handleMouseEnter = useCallback(() => {
-    hoveredRef.current = true
+  const handleMascotEnter = useCallback(() => {
+    if (hoverCloseTimerRef.current) {
+      clearTimeout(hoverCloseTimerRef.current)
+      hoverCloseTimerRef.current = null
+    }
     setHovered(true)
     const st = s.current
     if (st.phase !== 'wave') {
@@ -98,8 +96,7 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
     }
   }, [])
 
-  const handleMouseLeave = useCallback(() => {
-    hoveredRef.current = false
+  const closeMascotMenu = useCallback(() => {
     setHovered(false)
     const st = s.current
     if (st.phase === 'wave') {
@@ -109,6 +106,21 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
       st.lastFrameTime = 0
       st.lastPosTime = 0
       st.pausedPhase = null
+    }
+  }, [])
+
+  const handleMascotLeave = useCallback(() => {
+    if (hoverCloseTimerRef.current) {
+      clearTimeout(hoverCloseTimerRef.current)
+    }
+    hoverCloseTimerRef.current = setTimeout(closeMascotMenu, 120)
+  }, [closeMascotMenu])
+
+  useEffect(() => {
+    return () => {
+      if (hoverCloseTimerRef.current) {
+        clearTimeout(hoverCloseTimerRef.current)
+      }
     }
   }, [])
 
@@ -142,24 +154,6 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
     }
     loadNext()
   }, [])
-
-  // Bubble scheduler
-  const scheduleBubble = useCallback(function pumpBubble() {
-    const delay = (45 + Math.random() * 15) * 1000
-    bubbleTimerRef.current = setTimeout(() => {
-      // Don't show bubble if tab is hidden
-      if (!s.current.isHidden) {
-        setBubble(true)
-        setTimeout(() => setBubble(false), 8000)
-      }
-      pumpBubble()
-    }, delay)
-  }, [])
-
-  useEffect(() => {
-    scheduleBubble()
-    return () => { if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current) }
-  }, [scheduleBubble])
 
   // Visibility change listener
   useEffect(() => {
@@ -318,25 +312,24 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
   return (
     <div
       ref={wrapperRef}
-      className="fixed z-[15]"
+      className="pointer-events-none fixed z-mascot h-[160px] w-[160px]"
       style={{
         bottom: 'calc(env(safe-area-inset-bottom, 0px) + 0px)',
         right: 'calc(env(safe-area-inset-right, 0px) + 1rem)',
         transform: `translateX(0px)`,
         willChange: 'transform',
-        paddingTop: '100px',
       }}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
     >
       {/* Hover buttons — hiện trực tiếp không có đám mây */}
       {hovered && (
         <div
           className="absolute flex flex-col items-stretch gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200 ease-out pointer-events-auto"
+          onMouseEnter={handleMascotEnter}
+          onMouseLeave={handleMascotLeave}
           style={{
-            bottom: '115px',
+            bottom: '125px',
             right: '0px',
-            zIndex: 1001,
+            zIndex: 30,
             width: '160px',
           }}
         >
@@ -358,86 +351,7 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
         </div>
       )}
 
-      {/* Bubble hỏi tự động */}
-      {bubble && !hovered && (
-        <div
-          className="absolute flex flex-col items-center animate-in fade-in slide-in-from-bottom-2 zoom-in-95 duration-300 ease-out pointer-events-none"
-          style={{
-            zIndex: 1001,
-            bottom: '120px',
-            right: '-6px',
-            transformOrigin: 'calc(100% - 66px) 100%',
-          }}
-        >
-          {/* Main Cloud Bubble */}
-          <div className="relative w-[260px] h-[180px]">
-            <svg
-              viewBox="0 0 260 180"
-              width="260"
-              height="180"
-              xmlns="http://www.w3.org/2000/svg"
-              className="drop-shadow-[0_8px_16px_rgba(0,0,0,0.12)] filter absolute inset-0 z-10"
-            >
-              <g stroke="#e5e7eb" strokeWidth="3" fill="#ffffff">
-                <ellipse cx="130" cy="90" rx="85" ry="50" />
-                <circle cx="130" cy="55" r="40" />
-                <circle cx="130" cy="130" r="35" />
-                <circle cx="60" cy="75" r="35" />
-                <circle cx="200" cy="75" r="35" />
-                <circle cx="75" cy="50" r="30" />
-                <circle cx="185" cy="50" r="30" />
-                <circle cx="75" cy="130" r="30" />
-                <circle cx="185" cy="125" r="30" />
-                <circle cx="35" cy="100" r="25" />
-                <circle cx="225" cy="95" r="25" />
-              </g>
-              <g fill="#ffffff">
-                <ellipse cx="130" cy="90" rx="85" ry="50" />
-                <circle cx="130" cy="55" r="40" />
-                <circle cx="130" cy="130" r="35" />
-                <circle cx="60" cy="75" r="35" />
-                <circle cx="200" cy="75" r="35" />
-                <circle cx="75" cy="50" r="30" />
-                <circle cx="185" cy="50" r="30" />
-                <circle cx="75" cy="130" r="30" />
-                <circle cx="185" cy="125" r="30" />
-                <circle cx="35" cy="100" r="25" />
-                <circle cx="225" cy="95" r="25" />
-              </g>
-            </svg>
-
-            {/* Text Content */}
-            <div
-              className="absolute inset-0 flex flex-col items-center justify-center px-4 text-[14px] text-gray-700 whitespace-nowrap text-center leading-[1.5] font-medium z-20 pointer-events-auto"
-              style={{ top: '15px', bottom: '15px' }}
-            >
-              <span className="font-semibold text-[#a1001f] text-[15px] mb-1">Xin chào! 👋</span>
-              Bạn cần hướng dẫn<br />hay góp ý gì không?
-            </div>
-
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setBubble(false)
-              }}
-              className="absolute top-5 right-6 bg-white border border-gray-200 text-gray-400 rounded-full w-5 h-5 flex items-center justify-center hover:bg-gray-100 hover:text-gray-600 shadow-sm transition-all z-30 pointer-events-auto"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-
-          {/* 3 chấm đuôi */}
-          <div className="absolute w-4 h-4 bg-white rounded-full border-[1.5px] border-[#e5e7eb] shadow-sm z-0" style={{ bottom: '18px', right: '102px' }} />
-          <div className="absolute w-2.5 h-2.5 bg-white rounded-full border-[1.5px] border-[#e5e7eb] shadow-sm z-0" style={{ bottom: '6px', right: '92px' }} />
-          <div className="absolute w-1.5 h-1.5 bg-white rounded-full border border-[#e5e7eb] shadow-sm z-0" style={{ bottom: '-6px', right: '82px' }} />
-        </div>
-      )}
-
-      {/* Mascot sprite — to gấp đôi */}
-      <div
-        className="cursor-pointer select-none relative flex flex-col items-center justify-end"
-        onClick={() => setBubble(false)}
-      >
+      <div className="relative flex h-full w-full select-none flex-col items-center justify-end">
         {/* Bóng dưới chân — scale theo mascot */}
         <div className="absolute bottom-[28px] w-[60px] h-[10px] bg-black/20 mix-blend-multiply rounded-[100%] blur-[4px] pointer-events-none z-0" />
 
@@ -445,7 +359,24 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
           ref={canvasRef}
           width={200}
           height={200}
-          className="h-[160px] w-[160px] object-contain drop-shadow-sm relative z-10"
+          className="pointer-events-none relative z-10 h-[160px] w-[160px] object-contain drop-shadow-sm"
+        />
+
+        <button
+          type="button"
+          aria-label={hovered ? 'Đóng menu hỗ trợ' : 'Mở menu hỗ trợ'}
+          className="pointer-events-auto absolute bottom-[28px] left-1/2 z-20 h-[92px] w-[80px] -translate-x-1/2 cursor-pointer rounded-[45%] bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a1001f] focus-visible:ring-offset-2"
+          onMouseEnter={handleMascotEnter}
+          onMouseLeave={handleMascotLeave}
+          onFocus={handleMascotEnter}
+          onBlur={handleMascotLeave}
+          onClick={() => {
+            if (hovered) {
+              closeMascotMenu()
+            } else {
+              handleMascotEnter()
+            }
+          }}
         />
       </div>
     </div>
@@ -592,7 +523,7 @@ export default function UserFeedbackWidget() {
 
       {open && (
         <div
-          className="fixed inset-0 z-1001 bg-black/40 flex items-center justify-center p-4"
+          className="fixed inset-0 z-modal-backdrop-custom bg-black/40 flex items-center justify-center p-4"
           onClick={(e) => {
             if (e.target === e.currentTarget) setOpen(false)
           }}
@@ -770,7 +701,7 @@ export default function UserFeedbackWidget() {
       )}
 
       {previewImages && previewImages.length > 0 && (
-        <div className="fixed inset-0 z-1100 bg-black/80 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-modal-raised-custom bg-black/80 flex items-center justify-center p-4">
           <div className="relative w-full max-w-4xl">
             <button
               type="button"

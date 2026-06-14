@@ -181,7 +181,20 @@ export async function GET(
       });
 
       const relatedResult = await client.query(
-        `SELECT * FROM communications
+        `SELECT
+           id,
+           slug,
+           title,
+           description,
+           featured_image,
+           banner_image,
+           thumbnail_position,
+           post_type,
+           published_at,
+           view_count,
+           like_count,
+           created_at
+         FROM communications
          WHERE post_type = $1 AND status = 'published' AND id != $2
          ORDER BY created_at DESC LIMIT 3`,
         [post.post_type, post.id]
@@ -193,6 +206,11 @@ export async function GET(
         reaction,
         reaction_counts,
         relatedPosts: relatedResult.rows,
+      }, {
+        headers: {
+          'Cache-Control': 'private, no-store',
+          Vary: 'Cookie',
+        },
       });
     } finally {
       client.release();
@@ -306,7 +324,7 @@ export async function PUT(
       );
 
       if (status === 'published' && currentPost.status !== 'published') {
-        createNotificationForEveryone({
+        await createNotificationForEveryone({
           title: `Bài viết mới: ${safeTitle}`,
           content: safeDescription,
           type: 'communication',

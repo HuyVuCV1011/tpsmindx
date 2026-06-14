@@ -24,7 +24,6 @@ interface Post {
   slug: string
   title: string
   description: string
-  content: string
   featured_image: string
   banner_image: string
   thumbnail_position?: string
@@ -40,10 +39,36 @@ async function fetchPostsArray(url: string): Promise<Post[]> {
     return Array.isArray(data) ? (data as Post[]) : []
 }
 
+function selectTopViewedPosts(posts: Post[], limit: number): Post[] {
+  const top: Post[] = []
+
+  for (const post of posts) {
+    const insertAt = top.findIndex((candidate) => post.view_count > candidate.view_count)
+    if (insertAt === -1) {
+      if (top.length < limit) top.push(post)
+      continue
+    }
+
+    top.splice(insertAt, 0, post)
+    if (top.length > limit) top.pop()
+  }
+
+  return top
+}
+
 export default function CommunicationsPage() {
     const searchParams = useSearchParams()
     const { isOpen: isSidebarOpen } = useSidebar()
-    const { data: rawPosts, isLoading } = useSWR<Post[]>('/api/truyenthong/posts?status=published', fetchPostsArray, { revalidateOnFocus: false, dedupingInterval: 120000 })
+    const { data: rawPosts, isLoading } = useSWR<Post[]>(
+      '/api/truyenthong/posts?status=published',
+      fetchPostsArray,
+      {
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+        revalidateIfStale: false,
+        dedupingInterval: 300_000,
+      },
+    )
     const posts = Array.isArray(rawPosts) ? rawPosts : []
     const [selectedFilter, setSelectedFilter] = useState<string>('all')
     const [searchQuery, setSearchQuery] = useState('')
@@ -77,7 +102,8 @@ export default function CommunicationsPage() {
   }, [selectedFilter, searchQuery, posts])
 
   // Derived Data
-  const featuredPosts = posts.slice(0, 10) // Top 10 for Slider
+  const featuredPosts = posts.slice(0, 5)
+  const trendingPosts = useMemo(() => selectTopViewedPosts(posts, 5), [posts])
 
   const postTypes = [
     { value: 'all', label: 'Tất cả' },
@@ -99,7 +125,7 @@ export default function CommunicationsPage() {
       <div className="bg-white pb-20">
         {/* Hero Section - Slider + Sidebar */}
         {posts.length > 0 && (
-          <HeroSection posts={featuredPosts} />
+          <HeroSection posts={featuredPosts} trendingPosts={trendingPosts} />
         )}
 
         {/* Header Section - Now after slider */}

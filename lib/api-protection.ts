@@ -28,6 +28,7 @@
  * bước xác thực; bước xác thực thực sự luôn nằm trong route handler.
  */
 
+import { OFFICIAL_APP_ORIGINS } from '@/lib/allowed-app-origins';
 import { getApiSecret } from '@/lib/internal-api-secret';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -67,6 +68,7 @@ function parseExtraAllowedOrigins(raw: string | undefined): string[] {
 // Tổng hợp danh sách origin được phép (chạy một lần khi module được load)
 const ALLOWED_ORIGINS = Array.from(
   new Set<string>([
+    ...OFFICIAL_APP_ORIGINS,
     ...parseExtraAllowedOrigins(process.env.ALLOWED_API_EXTRA_ORIGINS),
     ...parseAppUrlsFromEnv(process.env.NEXT_PUBLIC_APP_URL),
   ]),

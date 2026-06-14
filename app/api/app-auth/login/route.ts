@@ -21,7 +21,7 @@
  *   - Cookie: httpOnly=true, secure=true (production), sameSite='lax'
  */
 import pool from '@/lib/db';
-import { checkTeacherExistsByEmail, isDatabaseUnavailableError } from '@/lib/db-helpers';
+import { checkTeacherExistsByEmailDetailed, isDatabaseUnavailableError } from '@/lib/db-helpers';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { clientIpFromRequest, rateLimitOr429Async } from '@/lib/rate-limit-memory';
 import { setSessionCookieOnResponse } from '@/lib/session-cookie';
@@ -161,10 +161,14 @@ export async function POST(request: NextRequest) {
     );
 
 
-    let teacherFoundInDb = false;
+    let teacherSync:
+      | { exists: boolean; dbUnavailable: boolean }
+      | undefined;
     if (user.role === 'teacher' && user.email) {
       try {
-        teacherFoundInDb = await checkTeacherExistsByEmail(String(user.email).trim().toLowerCase());
+        teacherSync = await checkTeacherExistsByEmailDetailed(
+          String(user.email).trim().toLowerCase(),
+        );
       } catch (teacherErr) {
         console.warn('App auth teacher lookup failed:', teacherErr);
       }
@@ -178,7 +182,12 @@ export async function POST(request: NextRequest) {
       role: user.role,
       isAdmin,
       permissions,
-      teacherSync: { foundInDatabase: teacherFoundInDb },
+      teacherSync: teacherSync
+        ? {
+            foundInDatabase: teacherSync.exists,
+            dbUnavailable: teacherSync.dbUnavailable,
+          }
+        : undefined,
     });
     setSessionCookieOnResponse(res, token);
 

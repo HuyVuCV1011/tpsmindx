@@ -2159,6 +2159,231 @@ const migrations: Migration[] = [
       WHERE is_read = FALSE;
     `,
   },
+  {
+    name: 'V92_truyenthong_read_indexes',
+    version: 92,
+    sql: `
+      CREATE INDEX IF NOT EXISTS idx_communications_status_created
+      ON communications(status, created_at DESC, id DESC);
+
+      CREATE INDEX IF NOT EXISTS idx_communications_status_views
+      ON communications(status, view_count DESC, id DESC);
+
+      CREATE INDEX IF NOT EXISTS idx_communications_related_posts
+      ON communications(post_type, status, created_at DESC, id DESC);
+    `,
+  },
+  {
+    name: 'V93_work_schedule_range_index',
+    version: 93,
+    sql: `
+      CREATE INDEX IF NOT EXISTS idx_dangky_lich_lam_date_time
+      ON dangky_lich_lam(ngay, gio_bat_dau, gio_ket_thuc);
+    `,
+  },
+  {
+    name: 'V94_backfill_communication_notifications',
+    version: 94,
+    sql: `
+      WITH active_recipients AS (
+        SELECT LOWER(TRIM(email)) AS recipient_email
+        FROM app_users
+        WHERE is_active IS TRUE
+          AND NULLIF(TRIM(email), '') IS NOT NULL
+
+        UNION
+
+        SELECT LOWER(
+          TRIM(
+            COALESCE(
+              NULLIF(TRIM(work_email), ''),
+              NULLIF(TRIM("Work email"), '')
+            )
+          )
+        ) AS recipient_email
+        FROM teachers
+        WHERE LOWER(
+          TRIM(
+            COALESCE(
+              NULLIF(TRIM(status), ''),
+              NULLIF(TRIM("Status"), ''),
+              'active'
+            )
+          )
+        ) NOT IN ('deactive', 'inactive', 'disabled')
+      )
+      INSERT INTO notifications (
+        recipient_email,
+        title,
+        content,
+        type,
+        link,
+        is_read,
+        created_at
+      )
+      SELECT
+        recipients.recipient_email,
+        'Bài viết mới: ' || communications.title,
+        COALESCE(communications.description, communications.title),
+        'communication',
+        '/user/truyenthong/' || communications.slug,
+        FALSE,
+        COALESCE(communications.published_at, communications.created_at, NOW())
+      FROM active_recipients recipients
+      CROSS JOIN communications
+      WHERE recipients.recipient_email IS NOT NULL
+        AND POSITION('@' IN recipients.recipient_email) > 1
+        AND communications.status = 'published'
+        AND COALESCE(communications.published_at, communications.created_at)
+          >= NOW() - INTERVAL '180 days'
+        AND NOT EXISTS (
+          SELECT 1
+          FROM notifications existing
+          WHERE LOWER(TRIM(existing.recipient_email)) = recipients.recipient_email
+            AND existing.type = 'communication'
+            AND existing.link = '/user/truyenthong/' || communications.slug
+        );
+    `,
+  },
+  {
+    name: 'V95_exam_notification_dispatch',
+    version: 95,
+    sql: `
+      ALTER TABLE notifications
+      ADD COLUMN IF NOT EXISTS dedupe_key VARCHAR(255);
+
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_notifications_recipient_dedupe
+      ON notifications (LOWER(TRIM(recipient_email)), dedupe_key)
+      WHERE dedupe_key IS NOT NULL;
+
+      CREATE TABLE IF NOT EXISTS notification_dispatch_state (
+        job_name VARCHAR(100) PRIMARY KEY,
+        last_processed_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      INSERT INTO notification_dispatch_state (job_name, last_processed_at)
+      VALUES ('exam_schedule_notifications', CURRENT_TIMESTAMP)
+      ON CONFLICT (job_name) DO NOTHING;
+    `,
+  },
+  {
+    name: 'V96_email_monitoring',
+    version: 96,
+    sql: `
+      CREATE TABLE IF NOT EXISTS email_delivery_logs (
+        id BIGSERIAL PRIMARY KEY,
+        status VARCHAR(20) NOT NULL CHECK (status IN ('sent', 'failed', 'skipped')),
+        sender_email VARCHAR(255),
+        to_recipients TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+        cc_recipients TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+        recipient_count INTEGER NOT NULL DEFAULT 0 CHECK (recipient_count >= 0),
+        subject TEXT NOT NULL DEFAULT '',
+        email_type VARCHAR(120) NOT NULL DEFAULT 'unknown',
+        source VARCHAR(255) NOT NULL DEFAULT 'unknown',
+        duration_ms INTEGER NOT NULL DEFAULT 0 CHECK (duration_ms >= 0),
+        provider_message_id VARCHAR(500),
+        smtp_response TEXT,
+        error_code VARCHAR(100),
+        error_category VARCHAR(50),
+        error_message TEXT,
+        response_code INTEGER,
+        retryable BOOLEAN NOT NULL DEFAULT FALSE,
+        metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_email_delivery_logs_created_at
+        ON email_delivery_logs(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_email_delivery_logs_status_created_at
+        ON email_delivery_logs(status, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_email_delivery_logs_error_category_created_at
+        ON email_delivery_logs(error_category, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_email_delivery_logs_email_type_created_at
+        ON email_delivery_logs(email_type, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS email_monitor_settings (
+        id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+        daily_message_limit INTEGER NOT NULL DEFAULT 2000 CHECK (daily_message_limit > 0),
+        daily_recipient_limit INTEGER NOT NULL DEFAULT 10000 CHECK (daily_recipient_limit > 0),
+        warning_threshold_percent NUMERIC(5, 2) NOT NULL DEFAULT 80
+          CHECK (warning_threshold_percent > 0 AND warning_threshold_percent <= 100),
+        latency_warning_ms INTEGER NOT NULL DEFAULT 5000 CHECK (latency_warning_ms > 0),
+        failure_rate_warning_percent NUMERIC(5, 2) NOT NULL DEFAULT 5
+          CHECK (failure_rate_warning_percent > 0 AND failure_rate_warning_percent <= 100),
+        retention_days INTEGER NOT NULL DEFAULT 90 CHECK (retention_days BETWEEN 7 AND 730),
+        updated_by_email VARCHAR(255),
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      INSERT INTO email_monitor_settings (id)
+      VALUES (1)
+      ON CONFLICT (id) DO NOTHING;
+    `,
+  },
+  {
+    name: 'V97_multi_email_accounts',
+    version: 97,
+    sql: `
+      CREATE TABLE IF NOT EXISTS email_sender_accounts (
+        id BIGSERIAL PRIMARY KEY,
+        account_key VARCHAR(120) NOT NULL UNIQUE,
+        email VARCHAR(255) NOT NULL,
+        display_name VARCHAR(255) NOT NULL DEFAULT 'TPS Teaching',
+        source VARCHAR(20) NOT NULL CHECK (source IN ('env', 'database')),
+        encrypted_app_password TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        daily_to_limit INTEGER NOT NULL DEFAULT 2000 CHECK (daily_to_limit > 0),
+        daily_cc_limit INTEGER NOT NULL DEFAULT 2000 CHECK (daily_cc_limit > 0),
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        last_selected_at TIMESTAMP WITH TIME ZONE,
+        last_verified_at TIMESTAMP WITH TIME ZONE,
+        last_verify_ok BOOLEAN,
+        last_verify_error TEXT,
+        created_by_email VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_email_sender_accounts_email
+        ON email_sender_accounts (LOWER(email));
+      CREATE INDEX IF NOT EXISTS idx_email_sender_accounts_active_order
+        ON email_sender_accounts (is_active, sort_order, id);
+
+      CREATE TABLE IF NOT EXISTS email_sender_routing_state (
+        id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+        last_account_id BIGINT REFERENCES email_sender_accounts(id) ON DELETE SET NULL,
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      INSERT INTO email_sender_routing_state (id)
+      VALUES (1)
+      ON CONFLICT (id) DO NOTHING;
+
+      ALTER TABLE email_delivery_logs
+        ADD COLUMN IF NOT EXISTS sender_account_id BIGINT
+          REFERENCES email_sender_accounts(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS to_recipient_count INTEGER NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS cc_recipient_count INTEGER NOT NULL DEFAULT 0;
+
+      UPDATE email_delivery_logs
+      SET
+        to_recipient_count = COALESCE(array_length(to_recipients, 1), 0),
+        cc_recipient_count = COALESCE(array_length(cc_recipients, 1), 0)
+      WHERE to_recipient_count = 0
+        AND cc_recipient_count = 0;
+
+      CREATE INDEX IF NOT EXISTS idx_email_delivery_logs_sender_created_at
+        ON email_delivery_logs(sender_account_id, created_at DESC);
+
+      ALTER TABLE email_monitor_settings
+        ADD COLUMN IF NOT EXISTS default_to_limit INTEGER NOT NULL DEFAULT 2000
+          CHECK (default_to_limit > 0),
+        ADD COLUMN IF NOT EXISTS default_cc_limit INTEGER NOT NULL DEFAULT 2000
+          CHECK (default_cc_limit > 0);
+    `,
+  },
 ]
 
 // ========== HÀM CHẠY MIGRATIONS ==========
