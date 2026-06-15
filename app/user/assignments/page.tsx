@@ -3,6 +3,7 @@
 
 
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { ExamFeedbackForm } from '@/components/assignments/ExamFeedbackForm'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { Modal } from '@/components/ui/modal'
 import { PageContainer } from '@/components/PageContainer'
@@ -27,6 +28,7 @@ import {
     FilterX,
     RefreshCw,
     Send,
+    MessageSquareText,
     Trophy,
     XCircle,
 } from 'lucide-react'
@@ -118,6 +120,9 @@ interface ExamAssignment {
   admin_note?: string
   is_open?: boolean
   can_take?: boolean
+  feedback_id?: number | null
+  feedback_rating?: number | null
+  feedback_status?: 'new' | 'in_progress' | 'done' | null
 }
 
 interface EffectiveExamScore {
@@ -240,6 +245,8 @@ export default function TeacherAssignmentPage() {
   // Track previous nowTs to detect crossing of open_at boundaries
   const lastNowTsRef = useRef(Date.now())
   const [selectedExamInfo, setSelectedExamInfo] =
+    useState<ExamAssignment | null>(null)
+  const [selectedFeedbackExam, setSelectedFeedbackExam] =
     useState<ExamAssignment | null>(null)
 
   const debounceTimersRef = useRef<Record<number, NodeJS.Timeout>>({})
@@ -2865,6 +2872,38 @@ export default function TeacherAssignmentPage() {
                                         new Date(item.open_at).getTime()
                                           ? 'Chưa tới giờ mở'
                                           : 'Chi tiết bài thi'}
+                                        </button>
+                                    )}
+
+                                    {effectiveScore !== null &&
+                                      (Number(item.selected_set_id) > 0 ||
+                                        Boolean(item.feedback_id)) && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setSelectedFeedbackExam(item)
+                                        }
+                                        className={`mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition ${
+                                          item.feedback_status === 'done'
+                                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                            : item.feedback_status ===
+                                                'in_progress'
+                                              ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                                              : 'border-[#e7c6cb] bg-[#fff7f8] text-[#a1001f] hover:bg-[#fdecef]'
+                                        }`}
+                                      >
+                                        <MessageSquareText className="h-4 w-4" />
+                                        {!item.feedback_id
+                                          ? 'Đánh giá bộ đề'
+                                          : item.feedback_status === 'new'
+                                            ? 'Chỉnh sửa đánh giá'
+                                            : item.feedback_status ===
+                                                'in_progress'
+                                              ? 'Đánh giá: Đang xử lý'
+                                              : 'Đánh giá: Đã xử lý'}
+                                        {item.feedback_rating
+                                          ? ` · ${item.feedback_rating}/5`
+                                          : ''}
                                       </button>
                                     )}
                                   </div>
@@ -3007,6 +3046,59 @@ export default function TeacherAssignmentPage() {
             ))}
           </div>
         )}
+
+        <Modal
+          open={selectedFeedbackExam !== null}
+          onClose={() => setSelectedFeedbackExam(null)}
+          title="Đánh giá bộ đề"
+          subtitle={
+            selectedFeedbackExam
+              ? `${selectedFeedbackExam.subject_code} · ${selectedFeedbackExam.set_code || selectedFeedbackExam.set_name || 'Bộ đề đã làm'}`
+              : ''
+          }
+          maxWidth="3xl"
+          headerColor="bg-[#a1001f]"
+          footer={
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setSelectedFeedbackExam(null)}
+              >
+                Đóng
+              </Button>
+            </div>
+          }
+        >
+          {selectedFeedbackExam ? (
+            <ExamFeedbackForm
+              resultId={selectedFeedbackExam.id}
+              onSaved={(savedReview) => {
+                setExamAssignments((current) =>
+                  current.map((item) =>
+                    item.id === selectedFeedbackExam.id
+                      ? {
+                          ...item,
+                          feedback_id: savedReview.id,
+                          feedback_rating: savedReview.rating,
+                          feedback_status: savedReview.status,
+                        }
+                      : item,
+                  ),
+                )
+                setSelectedFeedbackExam((current) =>
+                  current
+                    ? {
+                        ...current,
+                        feedback_id: savedReview.id,
+                        feedback_rating: savedReview.rating,
+                        feedback_status: savedReview.status,
+                      }
+                    : current,
+                )
+              }}
+            />
+          ) : null}
+        </Modal>
 
         {/* Pass Rate Drill-down Modal */}
         {(() => {

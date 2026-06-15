@@ -23,6 +23,7 @@
 import { requireBearerDbRoles } from '@/lib/auth-server';
 import { normalizeText as normalizeCampusText } from '@/lib/campus-data';
 import { getAccessibleCenters } from '@/lib/center-access';
+import { resolveCenterBuEmail } from '@/lib/center-bu-email-fallback';
 import {
     rejectIfEmailNotSelf,
     requireBearerSession,
@@ -47,6 +48,69 @@ import type { PoolClient } from 'pg';
 function releaseLeaveDbClient(client: PoolClient | undefined): undefined {
   if (client) client.release();
   return undefined;
+}
+
+type LeaveCenterRouting = {
+  valid: boolean;
+  centerId: number | null;
+  campusBuEmail: string | null;
+};
+
+async function resolveLeaveCenterRouting(
+  client: PoolClient,
+  requestedCenterId: number | null,
+  campus: string,
+): Promise<LeaveCenterRouting> {
+  const result =
+    requestedCenterId != null
+      ? await client.query(
+          `SELECT id, email, short_code, full_name
+           FROM centers
+           WHERE id = $1 AND status = 'Active'
+           LIMIT 1`,
+          [requestedCenterId],
+        )
+      : await client.query(
+          `SELECT id, email, short_code, full_name
+           FROM centers
+           WHERE status = 'Active'
+             AND (
+               LOWER(TRIM(full_name)) = LOWER(TRIM($1))
+               OR LOWER(TRIM(COALESCE(short_code, ''))) = LOWER(TRIM($1))
+             )
+           ORDER BY
+             CASE WHEN LOWER(TRIM(full_name)) = LOWER(TRIM($1)) THEN 0 ELSE 1 END,
+             id
+           LIMIT 1`,
+          [campus],
+        );
+
+  if (requestedCenterId != null && result.rowCount === 0) {
+    return {
+      valid: false,
+      centerId: requestedCenterId,
+      campusBuEmail: null,
+    };
+  }
+
+  const center = result.rows[0] as
+    | {
+        id: number;
+        email?: string | null;
+        short_code?: string | null;
+        full_name?: string | null;
+      }
+    | undefined;
+
+  return {
+    valid: true,
+    centerId: center?.id ?? requestedCenterId,
+    campusBuEmail: resolveCenterBuEmail(
+      center ?? {
+        full_name: campus,
+      },
+    ),
+  };
 }
 
 type LeaveStatus =
@@ -426,9 +490,6 @@ export async function POST(request: NextRequest) {
     const center_id_raw =
       (body as { center_id?: unknown; centerId?: unknown }).center_id ??
       (body as { centerId?: unknown }).centerId;
-    const campus_bu_email_raw =
-      (body as { campus_bu_email?: unknown; campus_email?: unknown })
-        .campus_bu_email ?? (body as { campus_email?: unknown }).campus_email;
 
     let resolvedCenterId: number | null = null;
     if (
@@ -446,51 +507,25 @@ export async function POST(request: NextRequest) {
       resolvedCenterId = cid;
     }
 
-    let campusBuEmailDb: string | null = null;
-    if (
-      typeof campus_bu_email_raw === 'string' &&
-      campus_bu_email_raw.trim().length > 0
-    ) {
-      const em = campus_bu_email_raw.trim();
-      if (em.length > 255) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Email BU cơ sở không quá 255 ký tự.',
-          },
-          { status: 400 },
-        );
-      }
-      if (!/\S+@\S+\.\S+/.test(em)) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Email BU cơ sở chưa đúng định dạng.',
-          },
-          { status: 400 },
-        );
-      }
-      campusBuEmailDb = em;
-    }
-
     client = await pool.connect();
 
-    if (resolvedCenterId != null) {
-      const ccheck = await client.query(
-        `SELECT id FROM centers WHERE id = $1 AND status = 'Active' LIMIT 1`,
-        [resolvedCenterId],
+    const centerRouting = await resolveLeaveCenterRouting(
+      client,
+      resolvedCenterId,
+      String(campus ?? ''),
+    );
+    if (!centerRouting.valid) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Cơ sở đã chọn không tồn tại hoặc không còn hoạt động (center_id).',
+        },
+        { status: 400 },
       );
-      if (ccheck.rowCount === 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              'Cơ sở đã chọn không tồn tại hoặc không còn hoạt động (center_id).',
-          },
-          { status: 400 },
-        );
-      }
     }
+    resolvedCenterId = centerRouting.centerId;
+    const campusBuEmailDb = centerRouting.campusBuEmail;
 
     const countSameClass = await client.query(
       `
@@ -568,7 +603,7 @@ export async function POST(request: NextRequest) {
     const newRequest = result.rows[0];
     client = releaseLeaveDbClient(client);
 
-    await sendLeaveRequestSubmittedEmail(
+    const emailDelivery = await sendLeaveRequestSubmittedEmail(
       {
         request_id: String(newRequest.id),
         teacher_name: String(newRequest.teacher_name ?? teacher_name),
@@ -624,7 +659,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Tạo yêu cầu xin nghỉ thành công',
-      data: newRequest
+      data: newRequest,
+      email_delivery: emailDelivery,
     });
   } catch (error: any) {
     console.error('leave-requests POST error:', error);
@@ -1045,9 +1081,6 @@ export async function PATCH(request: NextRequest) {
       const center_id_raw =
         (body as { center_id?: unknown; centerId?: unknown }).center_id ??
         (body as { centerId?: unknown }).centerId;
-      const campus_bu_email_raw =
-        (body as { campus_bu_email?: unknown; campus_email?: unknown })
-          .campus_bu_email ?? (body as { campus_email?: unknown }).campus_email;
 
       let resolvedCenterId: number | null = null;
       if (
@@ -1065,49 +1098,23 @@ export async function PATCH(request: NextRequest) {
         resolvedCenterId = cid;
       }
 
-      let campusBuEmailDb: string | null = null;
-      if (
-        typeof campus_bu_email_raw === 'string' &&
-        campus_bu_email_raw.trim().length > 0
-      ) {
-        const em = campus_bu_email_raw.trim();
-        if (em.length > 255) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: 'Email BU cơ sở không quá 255 ký tự.',
-            },
-            { status: 400 },
-          );
-        }
-        if (!/\S+@\S+\.\S+/.test(em)) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: 'Email BU cơ sở chưa đúng định dạng.',
-            },
-            { status: 400 },
-          );
-        }
-        campusBuEmailDb = em;
-      }
-
-      if (resolvedCenterId != null) {
-        const ccheck = await client.query(
-          `SELECT id FROM centers WHERE id = $1 AND status = 'Active' LIMIT 1`,
-          [resolvedCenterId],
+      const centerRouting = await resolveLeaveCenterRouting(
+        client,
+        resolvedCenterId,
+        String(campus ?? ''),
+      );
+      if (!centerRouting.valid) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              'Cơ sở đã chọn không tồn tại hoặc không còn hoạt động (center_id).',
+          },
+          { status: 400 },
         );
-        if (ccheck.rowCount === 0) {
-          return NextResponse.json(
-            {
-              success: false,
-              error:
-                'Cơ sở đã chọn không tồn tại hoặc không còn hoạt động (center_id).',
-            },
-            { status: 400 },
-          );
-        }
       }
+      resolvedCenterId = centerRouting.centerId;
+      const campusBuEmailDb = centerRouting.campusBuEmail;
 
       const rowEmail = String(existingRow.email ?? '').trim();
       const dup = await client.query(

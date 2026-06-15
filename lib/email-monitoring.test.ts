@@ -41,6 +41,16 @@ test('classifies invalid recipients as recipient errors', () => {
   assert.equal(result.retryable, false)
 })
 
+test('classifies missing leave-email routing data as configuration errors', () => {
+  const result = classifyEmailError({
+    code: 'MISSING_CAMPUS_BU_EMAIL',
+    message: 'Không có email BU/CS cơ sở để gửi mail xin nghỉ.',
+  })
+
+  assert.equal(result.category, 'configuration')
+  assert.equal(result.retryable, false)
+})
+
 test('calculates interpolated percentile', () => {
   assert.equal(percentile([100, 200, 300, 400], 0.95), 385)
   assert.equal(percentile([], 0.95), 0)
