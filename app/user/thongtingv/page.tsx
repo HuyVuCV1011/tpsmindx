@@ -2680,7 +2680,7 @@ export default function Page1() {
                         STT
                       </TableHead>
                       <TableHead className="text-left font-bold text-gray-700">
-                        {modalType === 'expertise' ? 'Bộ môn' : 'Khối'}
+                        {modalType === 'expertise' ? 'Bộ môn' : 'Môn kiểm tra'}
                       </TableHead>
                       {modalType === 'expertise' && (
                         <TableHead className="text-left font-bold text-gray-700">
@@ -2717,7 +2717,9 @@ export default function Page1() {
                         <TableCell className="font-semibold text-gray-900">
                           {modalType === 'expertise'
                             ? record.subject
-                            : record.teachingLevel}
+                            : record.subject
+                              ? <span>{record.subject}{record.teachingLevel ? <span className="ml-1 text-xs font-normal text-gray-500">({record.teachingLevel})</span> : null}</span>
+                              : record.teachingLevel}
                         </TableCell>
                         {modalType === 'expertise' && (
                           <TableCell className="text-gray-600">

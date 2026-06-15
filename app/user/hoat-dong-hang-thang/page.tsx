@@ -3366,7 +3366,7 @@ export default function MonthlyActivitiesPage() {
                               >
                                 <input
                                   type="radio"
-                                  name={`exam-schedule-${option}`}
+                                  name={`exam-schedule-${option.replace(/[\n\r\t]/g, ' ').replace(/\s+/g, '-')}`}
                                   value={event.id}
                                   checked={isActiveSlot}
                                   disabled={slotRegistered}
