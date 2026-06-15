@@ -101,6 +101,7 @@ export async function GET(request: NextRequest) {
         csm.ma_mon                                               AS subject_code,
         csm.ten_mon                                              AS subject_name,
         csm.ma_khoi                                              AS subject_block,
+        COALESCE(csm.loai_ky_thi, 'expertise')                  AS exam_type,
         -- Thời gian làm bài thực tế: đọc từ event_schedules (ket_thuc - bat_dau), fallback từ cột môn học
         COALESCE(ev_dur.duration_min, csm.thoi_gian_thi_phut, 90)::int AS duration_minutes,
         csr.id_mon,
