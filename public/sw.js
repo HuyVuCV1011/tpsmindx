@@ -13,8 +13,8 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'Teaching Portal System'
   const options = {
     body: payload.body || payload.content || 'Bạn có thông báo mới.',
-    icon: payload.icon || '/icon-192.png',
-    badge: payload.badge || '/icon-192.png',
+    icon: payload.icon || '/favicon.svg',
+    badge: payload.badge || '/favicon.svg',
     data: {
       url: payload.url || payload.link || '/user/thong-bao',
     },

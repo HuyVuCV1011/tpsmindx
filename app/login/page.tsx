@@ -1,9 +1,5 @@
 "use client";
 
-import { TpsBrandLogo } from '@/components/brand/TpsBrandLogo';
-import { InstallTpsApp } from '@/components/notifications/InstallTpsApp';
-import { Button } from '@/components/ui/button';
-import { Icon } from '@/components/ui/primitives/icon';
 import { toast } from '@/lib/app-toast';
 import {
   appendSafeAuthRedirect,
@@ -18,6 +14,9 @@ import {
 import { Eye, EyeOff } from 'lucide-react';
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from '@/components/ui/button';
+import { Icon } from '@/components/ui/primitives/icon';
+import { InstallTpsApp } from '@/components/notifications/InstallTpsApp';
 
 const SAVED_LOGIN_KEY = 'tps_saved_login_account';
 type LandingRole = 'teacher' | 'manager';
@@ -333,9 +332,8 @@ export default function LoginPage() {
         {/* Left side: Banner */}
         <div className="hidden md:flex flex-col justify-between items-start bg-linear-to-br from-[#800000] to-[#E31F26] w-1/3 h-full p-8 text-white">
           <div>
-            <div className="mb-6 w-32 rounded-3xl border border-white/70 bg-white p-3 shadow-[0_18px_45px_rgba(65,0,12,0.3)] animate-fade-in">
-              <TpsBrandLogo priority />
-            </div>
+            { }
+            <img src="/logo_white.svg" alt="logo" className="h-20 mb-8 animate-fade-in" />
             <h2 className="text-2xl font-bold mb-4 leading-tight animate-slide-up"> Teaching<br />Portal System (TPS)</h2>
             <p className="text-sm opacity-90 mb-8 animate-slide-up animation-delay-200">Hệ thống quản lý thông tin giáo viên, theo dõi tiến độ đào tạo, xử lý yêu cầu tra cứu thông tin nội bộ.</p>
           </div>
@@ -348,7 +346,8 @@ export default function LoginPage() {
         <div className="flex-1 flex flex-col justify-center px-4 sm:px-8 md:px-12 py-4 sm:py-6 animate-fade-in animation-delay-200">
           <div className="flex flex-col gap-4 mb-2">
             <div className="flex justify-center md:hidden">
-              <TpsBrandLogo className="w-16" priority />
+              { }
+              <img src="/logo.svg" alt="MindX logo" className="h-14 w-auto" />
             </div>
             <h2 className="hidden md:block text-xl font-bold text-center text-[#800000] animate-slide-up">MindX Technology School</h2>
             <div className="text-lg font-semibold text-gray-900 text-center mt-2 mb-1 animate-slide-up animation-delay-200">Chào mừng bạn đến với TPS</div>
