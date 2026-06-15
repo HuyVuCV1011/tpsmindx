@@ -1,5 +1,6 @@
 import { renderTemplate } from '@/app/api/emails/render';
 import { sendMail, type MailSendResult } from '@/app/api/emails/transporter';
+import { recordEmailDelivery } from '@/lib/email-delivery-log';
 
 const LEAVE_EMAIL_SOURCE = 'app/api/leave-requests';
 
@@ -65,6 +66,43 @@ export type LeaveRequestSubmittedData = {
   substitute_teacher?: string;
   substitute_email?: string;
 };
+
+function createLeaveEmailError(code: string, message: string): Error & {
+  code: string;
+} {
+  const error = new Error(message) as Error & { code: string };
+  error.code = code;
+  return error;
+}
+
+async function recordSubmittedEmailSkipped(
+  data: LeaveRequestSubmittedData,
+  subject: string,
+  code: string,
+  message: string,
+  metadata?: Record<string, unknown>,
+): Promise<void> {
+  const buEmail = String(data.campus_bu_email ?? '').trim();
+  await recordEmailDelivery({
+    status: 'skipped',
+    toRecipients: buEmail ? [buEmail] : [],
+    ccRecipients: uniqueRecipientEmails(
+      data.teacher_email,
+      data.substitute_email,
+    ),
+    subject,
+    emailType: 'leave_request_submitted',
+    source: LEAVE_EMAIL_SOURCE,
+    durationMs: 0,
+    error: createLeaveEmailError(code, message),
+    metadata: {
+      requestId: data.request_id,
+      campus: data.campus,
+      campusBuEmail: buEmail || null,
+      ...metadata,
+    },
+  });
+}
 
 function buildLeaveSubmittedClosingMessage(data: LeaveRequestSubmittedData): string {
   if (data.substitute_teacher?.trim()) {
@@ -322,13 +360,25 @@ export async function sendLeaveRequestSubmittedEmail(
 ): Promise<LeaveEmailSendResult> {
   const buTo = String(data.campus_bu_email ?? '').trim();
   const teacherEmail = String(data.teacher_email ?? '').trim();
+  const subject =
+    String(data.email_subject ?? '').trim() ||
+    `[MindX - ${data.campus || 'Cơ sở'}] V/v xin nghỉ 1 buổi dạy`;
+
   if (!data.teacher_name || !data.request_id || !teacherEmail) {
+    const errorMessage =
+      'Missing required fields: teacher_name, request_id, teacher_email';
     const result: LeaveEmailSendResult = {
       ok: false,
       sent: false,
-      error:
-        'Missing required fields: teacher_name, request_id, teacher_email',
+      error: errorMessage,
     };
+    await recordSubmittedEmailSkipped(
+      data,
+      subject,
+      'MISSING_REQUIRED_FIELDS',
+      errorMessage,
+      metadata,
+    );
     logLeaveEmailOutcome('leave_request_submitted', result, {
       requestId: data.request_id,
       ...metadata,
@@ -337,22 +387,26 @@ export async function sendLeaveRequestSubmittedEmail(
   }
 
   if (!buTo) {
+    const errorMessage = 'Không có email BU/CS cơ sở để gửi mail xin nghỉ.';
     const result: LeaveEmailSendResult = {
       ok: false,
       sent: false,
       warning: 'MISSING_CAMPUS_BU_EMAIL',
-      error: 'Không có email BU/CS cơ sở để gửi mail xin nghỉ.',
+      error: errorMessage,
     };
+    await recordSubmittedEmailSkipped(
+      data,
+      subject,
+      'MISSING_CAMPUS_BU_EMAIL',
+      errorMessage,
+      metadata,
+    );
     logLeaveEmailOutcome('leave_request_submitted', result, {
       requestId: data.request_id,
       ...metadata,
     });
     return result;
   }
-
-  const subject =
-    String(data.email_subject ?? '').trim() ||
-    `[MindX - ${data.campus || 'Cơ sở'}] V/v xin nghỉ 1 buổi dạy`;
 
   const html = renderTemplate('leave-request-submitted', {
     request_id: data.request_id,

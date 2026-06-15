@@ -189,34 +189,11 @@ export default function NotificationBell({ className = '' }: { className?: strin
     }
   };
 
-  // Request push notification permissions
+  // Open the dedicated cross-platform Web Push settings.
   const handleEnablePushNotifications = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      toast.error('Trình duyệt của bạn không hỗ trợ thông báo đẩy');
-      return;
-    }
-
-    if (Notification.permission === 'granted') {
-      toast.info('Thông báo đẩy đã được kích hoạt');
-      return;
-    }
-
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission === 'granted') {
-        toast.success('Đăng ký thành công', {
-          message: 'Bạn sẽ nhận được thông báo đẩy từ hệ thống.',
-        });
-      } else {
-        toast.warning('Quyền thông báo bị từ chối', {
-          message: 'Vui lòng mở cài đặt trình duyệt để cấp quyền thông báo.',
-        });
-      }
-    } catch (err) {
-      console.error('Error requesting push permission:', err);
-      toast.error('Không thể đăng ký thông báo đẩy');
-    }
+    setIsOpen(false);
+    router.push('/user/thong-bao?settings=device');
   };
 
   if (!user) return null;
@@ -266,11 +243,11 @@ export default function NotificationBell({ className = '' }: { className?: strin
               </button>
               <button
                 className="NotificationBell-module__doceWq__markAllRead"
-                title="Bật thông báo đẩy"
+                title="Cài đặt thông báo thiết bị"
                 style={{ color: 'var(--app-muted-foreground)' }}
                 onClick={handleEnablePushNotifications}
               >
-                Bật thông báo
+                Cài đặt thiết bị
               </button>
             </div>
           </div>

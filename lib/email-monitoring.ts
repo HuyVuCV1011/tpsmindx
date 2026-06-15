@@ -152,6 +152,7 @@ export function classifyEmailError(error: unknown): {
   }
 
   if (
+    code.startsWith('MISSING_') ||
     normalized.includes('not configured') ||
     normalized.includes('missing credential')
   ) {

@@ -1,0 +1,45 @@
+.logo {
+  display: inline-flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  isolation: isolate;
+  line-height: 0;
+}
+
+.mark {
+  display: block;
+  width: 100%;
+  height: auto;
+  transform-origin: 50% 50%;
+}
+
+.wordmark {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: -1.5%;
+}
+
+@keyframes tps-mark-spin {
+  0%,
+  16% {
+    transform: rotate(0deg) scale(1);
+  }
+
+  48% {
+    transform: rotate(360deg) scale(1.025);
+  }
+
+  56%,
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@media (min-width: 768px) and (prefers-reduced-motion: no-preference) {
+  .animated .mark {
+    animation: tps-mark-spin 9s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+    will-change: transform;
+  }
+}

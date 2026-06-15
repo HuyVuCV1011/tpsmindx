@@ -336,9 +336,10 @@ export async function POST(request: NextRequest) {
     await client.query(
       `UPDATE chuyen_sau_results SET
          thoi_gian_kiem_tra = TO_CHAR(NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI DD/MM/YYYY'),
-         id_su_kien         = COALESCE(id_su_kien, $1::uuid)
-       WHERE id = $2`,
-      [eventId, result_id]
+         id_su_kien         = COALESCE(id_su_kien, $1::uuid),
+         id_de_thi          = COALESCE(id_de_thi, $2)
+       WHERE id = $3`,
+      [eventId, resolvedSetId, result_id]
     );
 
     await client.query('COMMIT');
@@ -541,11 +542,12 @@ export async function PUT(request: NextRequest) {
       `UPDATE chuyen_sau_results SET
          diem         = $1,
          cau_dung     = $2,
+         id_de_thi    = COALESCE(id_de_thi, $3),
          trang_thai   = 'da_nop',
          thoi_gian_nop = NOW(),
          xu_ly_diem   = 'đã hoàn thành'
-       WHERE id = $3`,
-      [score10, correctCount, result_id]
+       WHERE id = $4`,
+      [score10, correctCount, resolvedSetId, result_id]
     );
 
     await client.query('COMMIT');

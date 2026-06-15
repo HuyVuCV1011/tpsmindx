@@ -1325,9 +1325,16 @@ ${editForm.teacher_name || '[Họ Và Tên]'}`
       const data = await response.json()
 
       if (data.success) {
-        toast.success(
-          'Tạo mail xin nghỉ thành công. Yêu cầu đã vào quy trình duyệt.',
-        )
+        if (data.email_delivery?.sent) {
+          toast.success(
+            'Tạo mail xin nghỉ thành công. Yêu cầu đã vào quy trình duyệt.',
+          )
+        } else {
+          toast.error(
+            `Yêu cầu đã được tạo nhưng email chưa gửi được. ${data.email_delivery?.error || 'Vui lòng báo quản trị kiểm tra Email Monitor.'}`,
+            { duration: 8000 },
+          )
+        }
         setShowModal(false)
         resetFormForNew()
         fetchLeaveRequests()
