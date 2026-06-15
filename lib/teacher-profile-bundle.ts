@@ -213,6 +213,7 @@ export async function fetchExpertiseBundleByCode(
        LEFT JOIN chuyen_sau_monhoc mh ON mh.id = r.id_mon
        WHERE r.diem IS NOT NULL
          AND r.xu_ly_diem IS NOT NULL  -- chỉ lấy bài đã xử lý (đã thi hoặc chờ giải trình)
+         AND COALESCE(mh.loai_ky_thi, 'expertise') = 'expertise'  -- CHỈ lấy kiểm tra chuyên sâu, không lấy trải nghiệm
          AND (
            LOWER(TRIM(COALESCE(r.ma_giao_vien, ''))) = ANY($1::text[])
            OR LOWER(TRIM(SPLIT_PART(COALESCE(r.dia_chi_email, ''), '@', 1))) = ANY($1::text[])
@@ -378,6 +379,133 @@ export async function fetchExpertiseBundleByCode(
 }
 
 const CSV_URL = process.env.NEXT_PUBLIC_RAWDATA_EXPERIENCE_CSV_URL || "";
+
+/**
+ * Trải nghiệm từ DB — query chuyen_sau_results với loai_ky_thi = 'experience'.
+ * Dùng cùng logic tính điểm như fetchExpertiseBundleByCode.
+ */
+export async function fetchExperienceDbBundleByCode(
+  pool: Pool,
+  code: string,
+  alternateCodes?: string[]
+) {
+  const client = await pool.connect();
+  try {
+    const codeAliases: string[] = [];
+    const addAlias = (s: string | undefined) => {
+      const t = String(s ?? "").trim().toLowerCase();
+      if (t) codeAliases.push(t);
+    };
+    addAlias(code);
+    alternateCodes?.forEach(addAlias);
+
+    if (codeAliases.length === 0) {
+      return { records: [], monthlyData: [], totalRecords: 0, teacherCode: code };
+    }
+
+    const result = await client.query(
+      `SELECT
+         r.khu_vuc            AS area,
+         r.ho_ten             AS name,
+         r.dia_chi_email      AS email,
+         COALESCE(mh.ten_mon, mh.ma_mon, r.id_mon::text, '') AS subject,
+         r.co_so_lam_viec     AS branch,
+         r.ma_giao_vien       AS code,
+         r.hinh_thuc          AS type,
+         COALESCE(EXTRACT(MONTH FROM r.lich_thi_dk)::int, r.thang_dk, EXTRACT(MONTH FROM r.tao_luc)::int) AS month,
+         COALESCE(EXTRACT(YEAR  FROM r.lich_thi_dk)::int, r.nam_dk,   EXTRACT(YEAR  FROM r.tao_luc)::int) AS year,
+         r.dot                AS batch,
+         r.thoi_gian_kiem_tra AS time,
+         r.cau_dung           AS correct,
+         r.diem               AS score,
+         r.email_giai_trinh   AS email_explanation,
+         r.xu_ly_diem         AS processing,
+         r.lich_thi_dk,
+         r.thang_dk,
+         r.nam_dk,
+         r.tao_luc,
+         EXISTS (
+           SELECT 1 FROM chuyen_sau_giaitrinh g
+           WHERE g.id_ket_qua = r.id
+             AND g.xu_ly_giai_trinh = 'đã duyệt'
+           LIMIT 1
+         ) AS has_accepted_explanation
+       FROM chuyen_sau_results r
+       LEFT JOIN chuyen_sau_monhoc mh ON mh.id = r.id_mon
+       WHERE r.diem IS NOT NULL
+         AND r.xu_ly_diem IS NOT NULL
+         AND COALESCE(mh.loai_ky_thi, 'expertise') = 'experience'  -- CHỈ lấy kiểm tra trải nghiệm
+         AND (
+           LOWER(TRIM(COALESCE(r.ma_giao_vien, ''))) = ANY($1::text[])
+           OR LOWER(TRIM(SPLIT_PART(COALESCE(r.dia_chi_email, ''), '@', 1))) = ANY($1::text[])
+         )
+       ORDER BY year DESC, month DESC`,
+      [codeAliases]
+    );
+
+    type DbRecord = {
+      area: string; name: string; email: string; subject: string;
+      branch: string; code: string; type: string; month: string; year: string;
+      batch: string; time: string; correct: string; score: string;
+      emailExplanation: string; processing: string; date: string;
+      isCountedInAverage: boolean;
+    };
+
+    const records: DbRecord[] = result.rows.map((row: Record<string, unknown>) => {
+      const m = parseInt(String(row.month ?? "").trim(), 10);
+      const y = parseInt(String(row.year ?? "").trim(), 10);
+      const dateStr = Number.isFinite(m) && Number.isFinite(y) ? `${m}/${y}` : `${row.month}/${row.year}`;
+      return {
+        area: String(row.area ?? ""),
+        name: String(row.name ?? ""),
+        email: String(row.email ?? ""),
+        subject: String(row.subject ?? ""),
+        branch: String(row.branch ?? ""),
+        code: String(row.code ?? ""),
+        type: String(row.type ?? ""),
+        month: String(m || ""),
+        year: String(y || ""),
+        batch: String(row.batch ?? ""),
+        time: String(row.time ?? ""),
+        correct: String(row.correct ?? "0"),
+        score: String(parseFloat(String(row.score ?? "0")) || 0),
+        emailExplanation: String(row.email_explanation ?? ""),
+        processing: String(row.processing ?? ""),
+        date: dateStr,
+        isCountedInAverage: !row.has_accepted_explanation,
+      };
+    });
+
+    const monthlyMap = new Map<string, DbRecord[]>();
+    records.forEach((r) => {
+      if (!monthlyMap.has(r.date)) monthlyMap.set(r.date, []);
+      monthlyMap.get(r.date)!.push(r);
+    });
+
+    type MonthlyAvg = { month: string; average: number; count: number; records: DbRecord[] };
+    const monthlyData: MonthlyAvg[] = [];
+    monthlyMap.forEach((monthRecords, month) => {
+      const counted = monthRecords.filter((r) => r.isCountedInAverage);
+      if (counted.length > 0) {
+        const sum = counted.reduce((acc, r) => acc + parseFloat(r.score), 0);
+        monthlyData.push({ month, average: sum / counted.length, count: counted.length, records: monthRecords });
+      } else {
+        monthlyData.push({ month, average: 0, count: 0, records: monthRecords });
+      }
+    });
+
+    monthlyData.sort((a, b) => {
+      const [mA, yA] = a.month.split("/").map(Number);
+      const [mB, yB] = b.month.split("/").map(Number);
+      if (yA !== yB) return yB - yA;
+      return mB - mA;
+    });
+
+    return { records, monthlyData, totalRecords: records.length, teacherCode: code };
+  } finally {
+    client.release();
+  }
+}
 
 /** Trải nghiệm — cùng logic với /api/rawdata-experience */
 export async function fetchExperienceBundleByCode(code: string) {
@@ -560,6 +688,7 @@ export type TeacherProfileBundle = {
 
 /**
  * Chỉ tải chuyên sâu + trải nghiệm (query/CSV nặng). Dùng sau khi đã có `teacher.code` từ bundle nhanh.
+ * Trải nghiệm = merge dữ liệu từ DB (loai_ky_thi='experience') + CSV (Google Sheet).
  */
 export async function loadTeacherScoresOnly(
   pool: Pool,
@@ -574,10 +703,56 @@ export async function loadTeacherScoresOnly(
     };
   }
   const alt = opts?.alternateCodes?.filter((c) => String(c).trim()) ?? [];
-  const [expertise, experience] = await Promise.all([
+  const [expertise, csvExperience, dbExperience] = await Promise.all([
     fetchExpertiseBundleByCode(pool, trimmed, alt).catch(() => null),
     fetchExperienceBundleByCode(trimmed).catch(() => null),
+    fetchExperienceDbBundleByCode(pool, trimmed, alt).catch(() => null),
   ]);
+
+  // Merge dữ liệu trải nghiệm từ CSV và DB
+  let experience = csvExperience;
+  if (dbExperience && dbExperience.records.length > 0) {
+    const csvRecords = csvExperience?.records ?? [];
+    const dbRecords = dbExperience.records;
+
+    // Gộp tất cả records
+    const allRecords = [...csvRecords, ...dbRecords];
+
+    // Rebuild monthlyData từ allRecords
+    type MergedRecord = (typeof allRecords)[0];
+    const monthlyMap = new Map<string, MergedRecord[]>();
+    allRecords.forEach((r) => {
+      if (!monthlyMap.has(r.date)) monthlyMap.set(r.date, []);
+      monthlyMap.get(r.date)!.push(r);
+    });
+
+    type MonthlyAvg = { month: string; average: number; count: number; records: MergedRecord[] };
+    const monthlyData: MonthlyAvg[] = [];
+    monthlyMap.forEach((monthRecords, month) => {
+      const counted = monthRecords.filter((r) => r.isCountedInAverage);
+      if (counted.length > 0) {
+        const sum = counted.reduce((acc, r) => acc + parseFloat(String(r.score).replace(",", ".")), 0);
+        monthlyData.push({ month, average: sum / counted.length, count: counted.length, records: monthRecords });
+      } else {
+        monthlyData.push({ month, average: 0, count: 0, records: monthRecords });
+      }
+    });
+
+    monthlyData.sort((a, b) => {
+      const [mA, yA] = a.month.split("/").map(Number);
+      const [mB, yB] = b.month.split("/").map(Number);
+      if (yA !== yB) return yB - yA;
+      return mB - mA;
+    });
+
+    experience = {
+      records: allRecords,
+      monthlyData,
+      totalRecords: allRecords.length,
+      teacherCode: trimmed,
+    } as typeof csvExperience;
+  }
+
   return { expertise, experience };
 }
 
@@ -626,16 +801,48 @@ export async function loadTeacherProfileBundle(
     };
   }
 
-  const [expertise, experience, certificates, training] = await Promise.all([
+  const [expertise, csvExperience, dbExperience, certificates, training] = await Promise.all([
     code
       ? fetchExpertiseBundleByCode(pool, code, expertiseAliases).catch(() => null)
       : Promise.resolve(null),
     code ? fetchExperienceBundleByCode(code).catch(() => null) : Promise.resolve(null),
+    code ? fetchExperienceDbBundleByCode(pool, code, expertiseAliases).catch(() => null) : Promise.resolve(null),
     workEmail
       ? fetchCertificatesByEmail(pool, workEmail).catch(() => null)
       : Promise.resolve(null),
     code ? fetchTrainingRowByCode(pool, code).catch(() => null) : Promise.resolve(null),
   ]);
+
+  // Merge trải nghiệm CSV + DB
+  let experience = csvExperience;
+  if (dbExperience && dbExperience.records.length > 0) {
+    const csvRecords = csvExperience?.records ?? [];
+    const allRecords = [...csvRecords, ...dbExperience.records];
+    type MergedRecord = (typeof allRecords)[0];
+    const monthlyMap = new Map<string, MergedRecord[]>();
+    allRecords.forEach((r) => {
+      if (!monthlyMap.has(r.date)) monthlyMap.set(r.date, []);
+      monthlyMap.get(r.date)!.push(r);
+    });
+    type MonthlyAvg = { month: string; average: number; count: number; records: MergedRecord[] };
+    const monthlyData: MonthlyAvg[] = [];
+    monthlyMap.forEach((monthRecords, month) => {
+      const counted = monthRecords.filter((r) => r.isCountedInAverage);
+      if (counted.length > 0) {
+        const sum = counted.reduce((acc, r) => acc + parseFloat(String(r.score).replace(",", ".")), 0);
+        monthlyData.push({ month, average: sum / counted.length, count: counted.length, records: monthRecords });
+      } else {
+        monthlyData.push({ month, average: 0, count: 0, records: monthRecords });
+      }
+    });
+    monthlyData.sort((a, b) => {
+      const [mA, yA] = a.month.split("/").map(Number);
+      const [mB, yB] = b.month.split("/").map(Number);
+      if (yA !== yB) return yB - yA;
+      return mB - mA;
+    });
+    experience = { records: allRecords, monthlyData, totalRecords: allRecords.length, teacherCode: code } as typeof csvExperience;
+  }
 
   return {
     exists: true,
