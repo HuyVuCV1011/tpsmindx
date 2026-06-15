@@ -20,8 +20,8 @@ export const metadata: Metadata = {
   },
   description: "Hệ thống quản lý giảng dạy",
   icons: {
-    icon: [{ url: "/icon-192.png", type: "image/png", sizes: "192x192" }],
-    shortcut: "/icon-192.png",
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    shortcut: "/favicon.svg",
     apple: "/icon-192.png",
   },
 };
