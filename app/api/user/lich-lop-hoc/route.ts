@@ -74,6 +74,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Phiên đăng nhập không hợp lệ' }, { status: 401 });
   }
 
+  const userEmail = session.email.toLowerCase().trim();
+  console.log('[lich-lop-hoc] User email:', userEmail);
+
   const firebaseToken = request.cookies.get('lms_firebase_token')?.value || '';
   
   if (!firebaseToken) {
@@ -136,18 +139,34 @@ export async function GET(request: NextRequest) {
         studentAttendance: slot.studentAttendance || [],
       });
 
-    const slots = classesResult.data.classes.data.flatMap((cls: any) => {
-      const classSlots = (cls.slots || [])
-        .slice()
-        .sort((a: any, b: any) => new Date(a.date || a.startTime).getTime() - new Date(b.date || b.startTime).getTime())
-        .map((slot: any) => mapSlot(cls, slot));
+    const slots = classesResult.data.classes.data
+      .filter((cls: any) => {
+        // Filter chỉ lấy lớp mà user có role LEC
+        const hasLecRole = (cls.slots || []).some((slot: any) => {
+          return (slot.teachers || []).some((t: any) => {
+            const teacherEmail = t.teacher?.email?.toLowerCase().trim();
+            const roleShortName = t.role?.shortName?.toUpperCase();
+            return teacherEmail === userEmail && roleShortName === 'LEC';
+          });
+        });
+        
+        if (!hasLecRole) {
+          console.log(`[lich-lop-hoc] Skipping class ${cls.name} - user is not LEC`);
+        }
+        
+        return hasLecRole;
+      })
+      .flatMap((cls: any) => {
+        const classSlots = (cls.slots || [])
+          .slice()
+          .sort((a: any, b: any) => new Date(a.date || a.startTime).getTime() - new Date(b.date || b.startTime).getTime())
+          .map((slot: any) => mapSlot(cls, slot));
 
-      return classSlots.map((slot: any) => ({
-        ...slot,
-        classSlots,
-      }));
-    }
-    );
+        return classSlots.map((slot: any) => ({
+          ...slot,
+          classSlots,
+        }));
+      });
 
     return NextResponse.json({ success: true, slots });
 
