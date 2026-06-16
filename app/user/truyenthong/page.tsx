@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { UpcomingEventsSidebar } from '@/components/upcoming-events-sidebar'
 import { useSidebar } from '@/lib/sidebar-context'
+import { TeacherHonorsPopup } from '@/components/teacher-honors-popup'
 
 // Skeleton Imports (Inline for simplicity or import if available)
 import { PostCardSkeleton } from '@/components/skeletons'
@@ -72,6 +73,7 @@ export default function CommunicationsPage() {
     const posts = Array.isArray(rawPosts) ? rawPosts : []
     const [selectedFilter, setSelectedFilter] = useState<string>('all')
     const [searchQuery, setSearchQuery] = useState('')
+    const [isPopupOpen, setIsPopupOpen] = useState(false)
   // Handle URL filter parameter
   useEffect(() => {
     const filterParam = searchParams.get('filter')
@@ -125,8 +127,19 @@ export default function CommunicationsPage() {
       <div className="bg-white pb-20">
         {/* Hero Section - Slider + Sidebar */}
         {posts.length > 0 && (
-          <HeroSection posts={featuredPosts} trendingPosts={trendingPosts} />
+          <HeroSection 
+            posts={featuredPosts} 
+            trendingPosts={trendingPosts}
+            onOpenPopup={() => setIsPopupOpen(true)}
+          />
         )}
+
+        {/* Teacher Honors Popup */}
+        <TeacherHonorsPopup
+          isOpen={isPopupOpen}
+          onOpen={() => setIsPopupOpen(true)}
+          onClose={() => setIsPopupOpen(false)}
+        />
 
         {/* Header Section - Now after slider */}
         <div className="bg-white">
