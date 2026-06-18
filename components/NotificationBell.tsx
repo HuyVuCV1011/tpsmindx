@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/auth-context';
 import { authHeaders } from '@/lib/auth-headers';
 import { toast } from '@/lib/app-toast';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 
@@ -81,8 +81,12 @@ function formatContentText(text: string): string {
 export default function NotificationBell({ className = '' }: { className?: string } = {}) {
   const { user, token } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const isAdminArea = pathname.startsWith('/admin');
+  const notificationLink = isAdminArea ? '/admin/thong-bao' : '/user/thong-bao';
 
   const fetcher = useMemo(
     () => (url: string) =>
@@ -193,7 +197,7 @@ export default function NotificationBell({ className = '' }: { className?: strin
   const handleEnablePushNotifications = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsOpen(false);
-    router.push('/user/thong-bao?settings=device');
+    router.push(`${notificationLink}?settings=device`);
   };
 
   if (!user) return null;
@@ -283,7 +287,7 @@ export default function NotificationBell({ className = '' }: { className?: strin
 
           <div className="NotificationBell-module__doceWq__dropdownFooter">
             <Link
-              href="/user/thong-bao"
+              href={notificationLink}
               className="NotificationBell-module__doceWq__viewAll"
               onClick={() => setIsOpen(false)}
             >

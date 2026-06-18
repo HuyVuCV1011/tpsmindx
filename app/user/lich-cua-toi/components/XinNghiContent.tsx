@@ -1386,9 +1386,9 @@ ${editForm.teacher_name || '[Họ Và Tên]'}`
                 size="lg"
                 variant="outline"
                 onClick={() => fetchLeaveRequests(true)}
-                className="h-10 border-[#f3b4bd] text-[#a1001f] shadow-sm hover:bg-[#a1001f]/5"
+                className="h-9 sm:h-10 border-[#f3b4bd] text-[#a1001f] shadow-sm hover:bg-[#a1001f]/5 px-3 sm:px-4 text-sm sm:text-base"
               >
-                <RefreshCcw className="mr-1.5 h-4 w-4" />
+                <RefreshCcw className="mr-1 sm:mr-1.5 h-4 w-4" />
                 Làm mới
               </Button>
               <Button
@@ -1398,10 +1398,11 @@ ${editForm.teacher_name || '[Họ Và Tên]'}`
                   setShowCampusPicker(false)
                   setShowModal(true)
                 }}
-                className="whitespace-nowrap border-2 border-[#a1001f] bg-[#a1001f] text-white shadow-md hover:bg-[#8a001a]"
+                className="whitespace-nowrap border-2 border-[#a1001f] bg-[#a1001f] text-white shadow-md hover:bg-[#8a001a] h-9 sm:h-10 px-3 sm:px-6 text-sm sm:text-base"
               >
-                <Plus className="mr-2 h-5 w-5" />
-                Tạo yêu cầu xin nghỉ
+                <Plus className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="hidden sm:inline">Tạo yêu cầu xin nghỉ</span>
+                <span className="inline sm:hidden">Tạo yêu cầu</span>
               </Button>
             </div>
           }
@@ -1477,8 +1478,8 @@ ${editForm.teacher_name || '[Họ Và Tên]'}`
         </div>
 
         {/* Bộ lọc nâng cao */}
-        <div className="mb-4 flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
-          <div className="relative w-full md:w-auto">
+        <div className="mb-4 grid grid-cols-2 gap-3 md:flex md:flex-row md:flex-wrap md:items-end">
+          <div className="relative col-span-2 w-full md:w-auto">
             <label className="block text-xs font-semibold text-gray-600 mb-1">
               Cơ sở
             </label>
@@ -1567,7 +1568,7 @@ ${editForm.teacher_name || '[Họ Và Tên]'}`
               </div>
             )}
           </div>
-          <div className="w-fit md:w-auto">
+          <div className="w-full md:w-auto">
             <label className="block text-xs font-semibold text-gray-600 mb-1">
               Từ ngày
             </label>
@@ -1579,7 +1580,7 @@ ${editForm.teacher_name || '[Họ Và Tên]'}`
               max={toDate || undefined}
             />
           </div>
-          <div className="w-fit md:w-auto">
+          <div className="w-full md:w-auto">
             <label className="block text-xs font-semibold text-gray-600 mb-1">
               Đến ngày
             </label>
@@ -1604,6 +1605,7 @@ ${editForm.teacher_name || '[Họ Và Tên]'}`
                 setToDate('')
                 setStatFilter(null)
               }}
+              className="col-span-2 w-full justify-center md:w-auto"
             >
               Xoá lọc
             </Button>
