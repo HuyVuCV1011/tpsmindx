@@ -496,6 +496,7 @@ export default function AppLayout({
     requireAdmin &&
     pathname.startsWith('/admin') &&
     user &&
+    (!user.isAdmin) &&
     (adminAccessState === 'checking' || adminAccessState === 'idle')
 
   if (adminGateBlocking) {
@@ -563,11 +564,12 @@ export default function AppLayout({
   }
 
   if (requireAdmin && user && pathname.startsWith('/admin')) {
-    if (adminAccessState !== 'allowed') {
+    const isCheckingButHasAdmin = user.isAdmin && (adminAccessState === 'checking' || adminAccessState === 'idle')
+    if (adminAccessState !== 'allowed' && !isCheckingButHasAdmin) {
       return null
     }
     /** Đã đồng bộ từ /api/check-admin; không tin bản ghi localStorage cũ. */
-    if (!user.isAdmin) {
+    if (adminAccessState === 'allowed' && !user.isAdmin) {
       return null
     }
   }

@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/primitives/icon';
+import { InstallTpsApp } from '@/components/notifications/InstallTpsApp';
 
 const SAVED_LOGIN_KEY = 'tps_saved_login_account';
 type LandingRole = 'teacher' | 'manager';
@@ -326,8 +327,8 @@ export default function LoginPage() {
   }, [email, password, role, updateUser, router, persistRememberedAccount]);
 
   return (
-    <div className="box-border h-dvh w-full overflow-hidden bg-white p-0 sm:min-h-screen sm:p-4 flex items-stretch sm:items-center sm:justify-center animate-fade-in">
-      <div className="bg-white flex h-full w-full overflow-hidden sm:max-w-4xl sm:rounded-xl sm:shadow-2xl md:h-135 transform transition-all duration-500 sm:hover:shadow-3xl animate-fade-in-up">
+    <div className="box-border h-dvh w-full overflow-x-hidden overflow-y-auto bg-white p-0 sm:min-h-screen sm:p-4 flex items-stretch sm:items-center sm:justify-center animate-fade-in">
+      <div className="bg-white flex min-h-full w-full overflow-visible sm:max-w-4xl sm:overflow-hidden sm:rounded-xl sm:shadow-2xl md:h-135 md:min-h-0 transform transition-all duration-500 sm:hover:shadow-3xl animate-fade-in-up">
         {/* Left side: Banner */}
         <div className="hidden md:flex flex-col justify-between items-start bg-linear-to-br from-[#800000] to-[#E31F26] w-1/3 h-full p-8 text-white">
           <div>
@@ -442,6 +443,9 @@ export default function LoginPage() {
               {isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
             </Button>
           </form>
+          <div className="mt-2 border-t border-gray-100 pt-1">
+            <InstallTpsApp compact hideWhenInstalled />
+          </div>
         </div>
       </div>
     </div>

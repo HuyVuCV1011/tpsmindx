@@ -124,6 +124,7 @@ function buildLogFilters(searchParams: URLSearchParams, interval: string) {
       OR COALESCE(provider_message_id, '') ILIKE ${placeholder}
       OR array_to_string(to_recipients, ',') ILIKE ${placeholder}
       OR array_to_string(cc_recipients, ',') ILIKE ${placeholder}
+      OR COALESCE(metadata::text, '') ILIKE ${placeholder}
     )`)
   }
 

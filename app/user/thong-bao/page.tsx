@@ -1,6 +1,7 @@
 'use client';
 
 import { PageContainer } from '@/components/PageContainer';
+import { DevicePushSetting } from '@/components/notifications/DevicePushSetting';
 import { useAuth } from '@/lib/auth-context';
 import { authHeaders } from '@/lib/auth-headers';
 import { toast } from '@/lib/app-toast';
@@ -182,6 +183,12 @@ export default function NotificationCenterPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'read' | 'settings'>('all');
   const [activeCategory, setActiveCategory] = useState<'all' | keyof typeof categoriesMap>('all');
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('settings') === 'device') {
+      setActiveTab('settings');
+    }
+  }, []);
   
   /**
    * CHỨC NĂNG CHUYỂN HƯỚNG CHI TIẾT THÔNG BÁO:
@@ -189,18 +196,7 @@ export default function NotificationCenterPage() {
    * tới đúng trang đích kèm tham số `id` để trang đó mở modal chi tiết tương ứng.
    */
 
-  // Settings states
-  const [pushEnabled, setPushEnabled] = useState(false);
   const [busyNotificationId, setBusyNotificationId] = useState<number | null>(null);
-
-  // Sync settings with browser APIs and localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const hasPermission = 'Notification' in window && Notification.permission === 'granted';
-      const userDisabled = localStorage.getItem('tps_push_notifications_disabled_by_user') === 'true';
-      setPushEnabled(hasPermission && !userDisabled);
-    }
-  }, []);
 
   const fetcher = useMemo(
     () => async (url: string) => {
@@ -378,94 +374,6 @@ export default function NotificationCenterPage() {
     }
   };
 
-  // Enable/Disable Browser Push notifications
-  const togglePushNotifications = async () => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      toast.error('Trình duyệt của bạn không hỗ trợ thông báo đẩy');
-      return;
-    }
-
-    // If currently enabled, toggle it off (manually disabled by user)
-    if (pushEnabled) {
-      setPushEnabled(false);
-      localStorage.setItem('tps_push_notifications_disabled_by_user', 'true');
-      toast.success('Đã tắt nhận thông báo trên thiết bị này');
-      return;
-    }
-
-    // If currently disabled, try to toggle it on
-    if (Notification.permission === 'granted') {
-      setPushEnabled(true);
-      localStorage.removeItem('tps_push_notifications_disabled_by_user');
-      toast.success('Đã bật thông báo thiết bị thành công');
-      // Trigger a test notification
-      try {
-        new Notification("Hệ thống TPS", {
-          body: "Bạn đã kích hoạt thành công thông báo trên thiết bị này.",
-        });
-      } catch (e) {
-        console.error(e);
-      }
-      return;
-    }
-
-    if (Notification.permission === 'denied') {
-      toast.warning('Quyền thông báo đã bị chặn', {
-        message: 'Vui lòng mở cài đặt trình duyệt của bạn để cấp lại quyền thông báo cho trang web này.',
-      });
-      return;
-    }
-
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission === 'granted') {
-        setPushEnabled(true);
-        localStorage.removeItem('tps_push_notifications_disabled_by_user');
-        toast.success('Đăng ký thành công', {
-          message: 'Bạn sẽ nhận được thông báo đẩy trên thiết bị này.',
-        });
-        // Trigger a test notification
-        try {
-          new Notification("Hệ thống TPS", {
-            body: "Chúc mừng! Bạn đã kích hoạt thành công thông báo trên thiết bị này.",
-          });
-        } catch (e) {
-          console.error(e);
-        }
-      } else {
-        setPushEnabled(false);
-        toast.warning('Quyền thông báo bị từ chối', {
-          message: 'Vui lòng mở cài đặt trình duyệt để cấp quyền thông báo.',
-        });
-      }
-    } catch (err) {
-      console.error('Error requesting push permission:', err);
-      toast.error('Không thể đăng ký thông báo đẩy');
-    }
-  };
-
-  // Send a test notification manually
-  const sendTestNotification = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (typeof window === 'undefined' || !('Notification' in window)) return;
-    
-    if (Notification.permission === 'granted') {
-      try {
-        new Notification("Hệ thống TPS", {
-          body: "Đây là thông báo thử nghiệm từ hệ thống TPS của bạn!",
-          icon: "/favicon.svg",
-        });
-        toast.success("Đã gửi thông báo thử nghiệm thành công!");
-      } catch (err) {
-        console.error("Error showing test notification:", err);
-        toast.error("Không thể kích hoạt thông báo trên thiết bị này.");
-      }
-    } else {
-      toast.warning("Vui lòng cấp quyền thông báo trước.");
-    }
-  };
-
   // Filters notifications based on the current active tab
   const tabFilteredNotifications = useMemo(() => {
     if (activeTab === 'all') return notifications;
@@ -633,33 +541,7 @@ export default function NotificationCenterPage() {
                   </label>
                 </div>
 
-                {/* Device Notification Setting */}
-                <div className="page-module__Qo6x2W__settingRow">
-                  <div className="page-module__Qo6x2W__settingInfo">
-                    <span className="page-module__Qo6x2W__settingLabel">Thông báo thiết bị (Điện thoại & Máy tính)</span>
-                    <span className="page-module__Qo6x2W__settingSub">
-                      Cho phép gửi thông báo đẩy trực tiếp lên màn hình điện thoại hoặc máy tính của bạn.
-                      {pushEnabled && (
-                        <button
-                          onClick={sendTestNotification}
-                          className="block mt-2 text-xs font-semibold text-[#a1001f] hover:underline"
-                          type="button"
-                        >
-                          🧪 Gửi thông báo thử nghiệm
-                        </button>
-                      )}
-                    </span>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={pushEnabled}
-                      onChange={togglePushNotifications}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#a1001f]"></div>
-                  </label>
-                </div>
+                <DevicePushSetting />
               </div>
             </div>
           ) : (

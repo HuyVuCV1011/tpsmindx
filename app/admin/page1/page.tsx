@@ -2409,25 +2409,17 @@ export default function Page1() {
               onClick={(e) => e.stopPropagation()}
             >
               <div
-                className={`${modalType === 'expertise' ? 'bg-gradient-to-r from-blue-600 to-blue-800' : 'bg-gradient-to-r from-purple-600 to-purple-800'} text-white px-3 sm:px-6 py-3 sm:py-5 flex items-center justify-between gap-2`}
+                className="bg-[#a1001f] text-white px-3 sm:px-6 py-3 sm:py-5 flex items-center justify-between gap-2"
               >
                 <div className="flex-1 min-w-0">
                   <h3 className="text-base sm:text-xl font-bold break-words text-pretty leading-snug">
                     Test T{modalMonth}
                   </h3>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-1 sm:mt-2">
-                    <span
-                      className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold w-fit ${
-                        modalType === 'expertise'
-                          ? 'bg-blue-500'
-                          : 'bg-purple-500'
-                      }`}
-                    >
+                    <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold w-fit bg-white/20">
                       {modalType === 'expertise' ? 'Chuyên môn' : 'Kỹ năng'}
                     </span>
-                    <p
-                      className={`text-xs sm:text-sm ${modalType === 'expertise' ? 'text-blue-100' : 'text-purple-100'}`}
-                    >
+                    <p className="text-xs sm:text-sm text-white/90">
                       <span className="font-semibold">
                         {modalRecords.length}
                       </span>{' '}
@@ -2472,7 +2464,7 @@ export default function Page1() {
                         STT
                       </TableHead>
                       <TableHead className="text-left font-bold text-gray-700">
-                        {modalType === 'expertise' ? 'Bộ môn' : 'Khối'}
+                        {modalType === 'expertise' ? 'Bộ môn' : 'Môn kiểm tra'}
                       </TableHead>
                       {modalType === 'expertise' && (
                         <TableHead className="text-left font-bold text-gray-700">
@@ -2509,7 +2501,9 @@ export default function Page1() {
                         <TableCell className="font-semibold text-gray-900">
                           {modalType === 'expertise'
                             ? record.subject
-                            : record.teachingLevel}
+                            : record.subject
+                              ? <span>{record.subject}{record.teachingLevel ? <span className="ml-1 text-xs font-normal text-gray-500">({record.teachingLevel})</span> : null}</span>
+                              : record.teachingLevel}
                         </TableCell>
                         {modalType === 'expertise' && (
                           <TableCell className="text-gray-600">

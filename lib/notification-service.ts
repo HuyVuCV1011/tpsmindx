@@ -1,5 +1,6 @@
 import pool from './db';
 import { getPublicBaseUrl } from './public-base-url';
+import { sendWebPush } from './web-push';
 
 interface NotificationPayload {
   recipientEmail: string;
@@ -9,23 +10,88 @@ interface NotificationPayload {
   link?: string;
 }
 
+async function deliverPushNotifications(
+  recipientEmail: string | null,
+  payload: Omit<NotificationPayload, 'recipientEmail'>,
+) {
+  try {
+    const subscriptions = await pool.query(
+      `SELECT id, endpoint, p256dh, auth_secret
+       FROM push_subscriptions
+       ${recipientEmail ? 'WHERE LOWER(recipient_email) = $1' : ''}
+       ORDER BY id`,
+      recipientEmail ? [recipientEmail] : [],
+    );
+
+    for (let index = 0; index < subscriptions.rows.length; index += 20) {
+      const batch = subscriptions.rows.slice(index, index + 20);
+      await Promise.allSettled(
+        batch.map(async (subscription) => {
+          const result = await sendWebPush(
+            {
+              endpoint: subscription.endpoint,
+              p256dh: subscription.p256dh,
+              auth: subscription.auth_secret,
+            },
+            {
+              title: payload.title,
+              body: payload.content,
+              link: payload.link || '/user/thong-bao',
+              tag: `tps-${payload.type}`,
+            },
+          );
+
+          if (result.ok) {
+            await pool.query(
+              `UPDATE push_subscriptions
+               SET last_success_at = CURRENT_TIMESTAMP
+               WHERE id = $1`,
+              [subscription.id],
+            );
+          } else if (result.status === 404 || result.status === 410) {
+            await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [
+              subscription.id,
+            ]);
+          }
+        }),
+      );
+    }
+  } catch (err: any) {
+    if (err?.code !== '42P01') {
+      console.error('[NotificationService] Web Push delivery failed:', err);
+    }
+  }
+}
+
 /**
  * Creates an in-app notification for a user.
  */
 export async function createNotification(payload: NotificationPayload): Promise<void> {
   const { recipientEmail, title, content, type, link } = payload;
+  const normalizedEmail = recipientEmail.trim().toLowerCase();
+  let created = false;
   let client;
   try {
     client = await pool.connect();
     await client.query(
       `INSERT INTO notifications (recipient_email, title, content, type, link, is_read, created_at)
        VALUES ($1, $2, $3, $4, $5, FALSE, NOW())`,
-      [recipientEmail.trim().toLowerCase(), title, content, type, link || null]
+      [normalizedEmail, title, content, type, link || null]
     );
+    created = true;
   } catch (err) {
     console.error('[NotificationService] Failed to create in-app notification:', err);
   } finally {
     client?.release();
+  }
+
+  if (created) {
+    await deliverPushNotifications(normalizedEmail, {
+      title,
+      content,
+      type,
+      link,
+    });
   }
 }
 
@@ -34,6 +100,7 @@ export async function createNotification(payload: NotificationPayload): Promise<
  */
 export async function createNotificationForEveryone(payload: Omit<NotificationPayload, 'recipientEmail'>): Promise<void> {
   const { title, content, type, link } = payload;
+  let created = false;
   let client;
   try {
     client = await pool.connect();
@@ -96,10 +163,15 @@ export async function createNotificationForEveryone(payload: Omit<NotificationPa
     console.info(
       `[NotificationService] Created notification for ${result.rows[0]?.inserted_count || 0} active recipients`
     );
+    created = true;
   } catch (err) {
     console.error('[NotificationService] Failed to create notifications for everyone:', err);
   } finally {
     client?.release();
+  }
+
+  if (created) {
+    await deliverPushNotifications(null, { title, content, type, link });
   }
 }
 
