@@ -97,13 +97,21 @@ export const POST = withApiProtection(async (request: NextRequest) => {
       // ── 3. Validate isCompleted ──────────────────────────────────────────
       // Tự động mark completed nếu xem quá 98% duration (tránh kẹt ở 99% do lệch giây)
       const AUTO_COMPLETE_THRESHOLD = 0.98;
+      // Trust client isCompleted=true trực tiếp — đây là signal từ video 'ended' event,
+      // không cần server_time vượt ngưỡng. Anti-cheat đã được xử lý phía client (wall-clock).
       let validatedIsCompleted = isCompleted === true;
 
-      if (videoDurationSeconds) {
+      if (!validatedIsCompleted && videoDurationSeconds) {
         const progressRatio = clampedServerTime / videoDurationSeconds;
         if (progressRatio >= AUTO_COMPLETE_THRESHOLD) {
           validatedIsCompleted = true;
         }
+      }
+
+      // Nếu client gửi isCompleted=true kèm totalDuration nhưng DB chưa có duration
+      // → bản thân client đã xem hết (handleEnded fired), tin tưởng luôn
+      if (isCompleted === true && totalDuration && totalDuration > 0 && !videoDurationSeconds) {
+        validatedIsCompleted = true;
       }
 
       // Nếu đã completed trước đó → giữ nguyên
@@ -112,13 +120,19 @@ export const POST = withApiProtection(async (request: NextRequest) => {
       }
 
       // ── 4. Update video duration nếu client cung cấp ────────────────────
+      // Lưu cả duration_seconds (chính xác) để effectiveCompletion tính threshold đúng
       if (totalDuration && typeof totalDuration === 'number' && totalDuration > 0) {
+        const durationSeconds = Math.floor(totalDuration);
         const durationMinutes = Math.max(1, Math.ceil(totalDuration / 60));
         await client.query(
           `UPDATE training_videos
-           SET duration_minutes = $1
+           SET duration_minutes = $1,
+               duration_seconds = CASE
+                 WHEN duration_seconds IS NULL OR duration_seconds = 0 THEN $3
+                 ELSE duration_seconds
+               END
            WHERE id = $2 AND (duration_minutes IS NULL OR duration_minutes != $1)`,
-          [durationMinutes, videoId]
+          [durationMinutes, videoId, durationSeconds]
         ).catch(() => { /* non-blocking */ });
       }
 

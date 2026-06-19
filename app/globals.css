@@ -662,10 +662,55 @@
 .ProseMirror a {
   color: rgb(59 130 246);
   text-decoration: underline;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 .ProseMirror a:hover {
   color: rgb(29 78 216);
+}
+
+/* Responsive link styles for mobile */
+@media (max-width: 640px) {
+  .ProseMirror a {
+    display: inline-block;
+    max-width: 100%;
+    text-overflow: ellipsis;
+  }
+  
+  /* Handle hashtags and long links */
+  .ProseMirror a[href*="#"] {
+    word-break: break-all;
+    hyphens: none;
+  }
+}
+
+/* Also style links in post-content-renderer */
+.post-content-renderer a {
+  color: rgb(59 130 246);
+  text-decoration: underline;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.post-content-renderer a:hover {
+  color: rgb(29 78 216);
+}
+
+@media (max-width: 640px) {
+  .post-content-renderer a {
+    display: inline-block;
+    max-width: 100%;
+  }
+  
+  .post-content-renderer a[href*="#"] {
+    word-break: break-all;
+    hyphens: none;
+  }
 }
 
 .ProseMirror img {

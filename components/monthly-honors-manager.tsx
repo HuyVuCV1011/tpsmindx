@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Trophy, Upload, X, CheckCircle, AlertCircle, ChevronDown, Trash2, Eye, Star, Crown, Medal, Download, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import useSWR from 'swr'
@@ -22,6 +22,7 @@ interface HonorRecord {
   loai: string | null
   thuong_cr: number
   avatar_url: string | null
+  slogan: string | null
 }
 
 interface VinhDanhData {
@@ -40,31 +41,78 @@ function initials(name: string) {
     : (p[p.length - 2][0] + p[p.length - 1][0]).toUpperCase()
 }
 
+// ─── Inline editable field ────────────────────────────────────────────────────
+
+function EditableField({
+  value, placeholder, onSave, className, inputClassName,
+}: {
+  value: string; placeholder?: string
+  onSave: (val: string) => void
+  className?: string; inputClassName?: string
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { if (editing) inputRef.current?.select() }, [editing])
+
+  const commit = () => { setEditing(false); if (draft.trim() !== value) onSave(draft.trim()) }
+  const cancel = () => { setEditing(false); setDraft(value) }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel() }}
+        className={cn('bg-black/20 border border-white/40 rounded-lg text-center outline-none w-full px-1', inputClassName)}
+        placeholder={placeholder}
+      />
+    )
+  }
+  return (
+    <span
+      onClick={() => { setEditing(true); setDraft(value) }}
+      title="Click để chỉnh sửa"
+      className={cn('cursor-pointer hover:bg-white/10 rounded transition-colors px-1', className)}
+    >
+      {value || <span className="opacity-40 italic">{placeholder}</span>}
+    </span>
+  )
+}
+
 // ─── Honor Card (preview display) ────────────────────────────────────────────
 
-function HonorCard({ record, rank }: { record: HonorRecord; rank: number }) {
-  const rankColors = [
-    { bg: 'from-amber-600 to-yellow-500', badge: 'bg-amber-600', ring: 'ring-yellow-400', icon: Crown },
-    { bg: 'from-slate-500 to-slate-400', badge: 'bg-slate-500', ring: 'ring-slate-300', icon: Medal },
-    { bg: 'from-orange-700 to-orange-500', badge: 'bg-orange-700', ring: 'ring-orange-400', icon: Medal },
+const DEFAULT_SLOGANS = ['Kiên trì · Không bỏ cuộc', 'Chấp nhận · Làm lại', 'Cải thiện · Tốt hơn']
+
+function HonorCard({
+  record, rank, onUpdate,
+}: {
+  record: HonorRecord; rank: number
+  onUpdate?: (field: 'slogan' | 'full_name' | 'co_so', value: string) => void
+}) {
+  const rankConfigs = [
+    { bg: 'from-rose-500 to-pink-600',      badge: 'bg-rose-600',   ring: 'ring-rose-300',   icon: Crown },
+    { bg: 'from-indigo-500 to-violet-600',  badge: 'bg-indigo-600', ring: 'ring-indigo-300', icon: Medal },
+    { bg: 'from-teal-500 to-emerald-600',   badge: 'bg-teal-600',   ring: 'ring-teal-300',   icon: Medal },
   ]
-  const cfg = rankColors[rank - 1] || rankColors[2]
+  const cfg = rankConfigs[rank - 1] || rankConfigs[2]
   const Icon = cfg.icon
+  const slogan = record.slogan || DEFAULT_SLOGANS[rank - 1] || ''
 
   return (
     <div className={cn(
       'relative flex flex-col items-center rounded-2xl p-4 text-white shadow-lg transition-transform hover:-translate-y-0.5',
       'bg-gradient-to-br', cfg.bg,
-      rank === 1 ? 'w-[210px] min-h-[260px]' : 'w-[190px] min-h-[240px]'
+      rank === 1 ? 'w-[210px] min-h-[270px]' : 'w-[190px] min-h-[248px]'
     )}>
       {/* rank badge */}
       <div className={cn('absolute top-2.5 left-2.5 rounded-lg px-2 py-0.5 text-[10px] font-black', cfg.badge)}>
         #{rank}
       </div>
-      {/* top icon */}
-      {rank === 1 && (
-        <Icon className="absolute top-2.5 left-1/2 -translate-x-1/2 w-5 h-5 text-yellow-200" />
-      )}
+      {rank === 1 && <Icon className="absolute top-2.5 left-1/2 -translate-x-1/2 w-5 h-5 text-white/80" />}
 
       {/* Avatar */}
       <div className={cn(
@@ -83,23 +131,64 @@ function HonorCard({ record, rank }: { record: HonorRecord; rank: number }) {
         )}
       </div>
 
-      {/* Info */}
-      <div className="mt-3 flex flex-col items-center text-center gap-1.5 flex-1 w-full px-1">
-        <p className={cn('font-black leading-snug', rank === 1 ? 'text-[14px]' : 'text-[13px]')}>
-          {record.full_name}
-        </p>
-        {/* Cơ sở — full text, không cắt */}
-        <p className={cn('text-white/80 font-medium leading-snug', rank === 1 ? 'text-[11px]' : 'text-[10px]')}
-          style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-          {record.co_so || '—'}
-        </p>
-        {/* Tỉ lệ nổi bật */}
-        <div className="flex items-center gap-1.5 bg-black/30 backdrop-blur-sm rounded-xl px-3 py-1.5 mt-auto border border-white/15">
+      {/* Info — editable khi có onUpdate */}
+      <div className="mt-3 flex flex-col items-center text-center gap-1 flex-1 w-full px-1">
+        {onUpdate ? (
+          <EditableField
+            value={record.full_name}
+            placeholder="Họ và tên"
+            onSave={v => onUpdate('full_name', v)}
+            className={cn('font-black leading-snug block w-full', rank === 1 ? 'text-[14px]' : 'text-[13px]')}
+            inputClassName={cn('font-black text-white', rank === 1 ? 'text-[14px]' : 'text-[13px]')}
+          />
+        ) : (
+          <p className={cn('font-black leading-snug', rank === 1 ? 'text-[14px]' : 'text-[13px]')}>
+            {record.full_name}
+          </p>
+        )}
+
+        {onUpdate ? (
+          <EditableField
+            value={record.co_so || ''}
+            placeholder="Cơ sở"
+            onSave={v => onUpdate('co_so', v)}
+            className="text-white/80 font-medium text-[10px] block w-full"
+            inputClassName="text-[10px] text-white"
+          />
+        ) : (
+          <p className="text-white/80 font-medium text-[10px]" style={{ wordBreak: 'break-word' }}>
+            {record.co_so || '—'}
+          </p>
+        )}
+
+        {/* Tỉ lệ */}
+        <div className="flex items-center gap-1.5 bg-black/30 rounded-xl px-3 py-1.5 mt-1 border border-white/15">
           <Star className="w-3 h-3 fill-yellow-300 text-yellow-300 shrink-0" />
           <span className={cn('font-black tabular-nums', rank === 1 ? 'text-[15px]' : 'text-[13px]')}>
             {record.ti_le.toFixed(1)}%
           </span>
         </div>
+
+        {/* Slogan — editable */}
+        <div className="w-full bg-black/30 rounded-xl px-2 py-1.5 mt-1 border border-white/10">
+          {onUpdate ? (
+            <EditableField
+              value={slogan}
+              placeholder="Nhập slogan..."
+              onSave={v => onUpdate('slogan', v)}
+              className="font-black text-white/90 text-[8px] uppercase tracking-wider block w-full text-center"
+              inputClassName="font-black text-[8px] uppercase text-white"
+            />
+          ) : (
+            <span className="font-black text-white/90 text-[8px] uppercase tracking-wider text-center block">
+              {slogan}
+            </span>
+          )}
+        </div>
+
+        {onUpdate && (
+          <p className="text-white/40 text-[8px] mt-0.5">✎ click text để sửa</p>
+        )}
       </div>
     </div>
   )
@@ -107,8 +196,12 @@ function HonorCard({ record, rank }: { record: HonorRecord; rank: number }) {
 
 // ─── Podium Preview ───────────────────────────────────────────────────────────
 
-function PodiumPreview({ records }: { records: HonorRecord[] }) {
-  // Top 3, arranged: 2nd, 1st, 3rd
+function PodiumPreview({
+  records, onUpdateRecord,
+}: {
+  records: HonorRecord[]
+  onUpdateRecord?: (id: number, field: 'slogan' | 'full_name' | 'co_so', value: string) => void
+}) {
   const top3 = records.slice(0, 3)
   const podium = [top3[1], top3[0], top3[2]].filter(Boolean) as HonorRecord[]
   const podiumRanks = [2, 1, 3]
@@ -116,7 +209,12 @@ function PodiumPreview({ records }: { records: HonorRecord[] }) {
   return (
     <div className="flex items-end justify-center gap-3">
       {podium.map((r, i) => (
-        <HonorCard key={r.id} record={r} rank={podiumRanks[i]} />
+        <HonorCard
+          key={r.id}
+          record={r}
+          rank={podiumRanks[i]}
+          onUpdate={onUpdateRecord ? (field, val) => onUpdateRecord(r.id, field, val) : undefined}
+        />
       ))}
     </div>
   )
@@ -610,6 +708,15 @@ export default function MonthlyHonorsManager() {
     }
   }
 
+  const handleUpdateRecord = async (id: number, field: 'slogan' | 'full_name' | 'co_so', value: string) => {
+    await fetch('/api/truyenthong/vinh-danh', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, [field]: value }),
+    })
+    mutate()
+  }
+
   return (
     <>
       {/* ── Trigger button ── */}
@@ -754,7 +861,7 @@ export default function MonthlyHonorsManager() {
                       </span>
                     </span>
                   </div>
-                  <PodiumPreview records={records} />
+                  <PodiumPreview records={records} onUpdateRecord={handleUpdateRecord} />
                   {records.length > 3 && (
                     <div className="mt-6 text-center">
                       <button

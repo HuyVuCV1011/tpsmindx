@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { parseCsvLine } from '@/lib/csv-registration-import'
-import { createSupabaseS3Client, isSupabaseS3Configured } from '@/lib/supabase-s3'
+import { createSupabaseS3Client, isSupabaseS3Configured, parsePublicUrl, deleteObject } from '@/lib/supabase-s3'
 import { CreateBucketCommand, HeadBucketCommand, PutObjectCommand } from '@aws-sdk/client-s3'
 
-const BUCKET_NAME = 'mindx-thumbnails'
+const BUCKET_NAME = 'mindx-avatars'  // dùng chung bucket avatar giáo viên
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+// Prefix đặc biệt để nhận diện ảnh vinh danh — KHÔNG dùng cho avatar thường
+const HONORS_KEY_PREFIX = 'honors-monthly/'
 
 async function ensureBucket() {
   const client = createSupabaseS3Client()
@@ -18,6 +20,20 @@ async function ensureBucket() {
 
 function makeProxyUrl(bucket: string, key: string): string {
   return `/api/storage-image?bucket=${encodeURIComponent(bucket)}&key=${encodeURIComponent(key)}`
+}
+
+/** Xóa ảnh vinh danh cũ trên S3 nếu URL thuộc prefix honors-monthly/ */
+async function deleteHonorsAvatarIfOwned(avatarUrl: string | null): Promise<void> {
+  if (!avatarUrl || !isSupabaseS3Configured()) return
+  try {
+    const parsed = parsePublicUrl(avatarUrl)
+    if (!parsed) return
+    // Chỉ xóa nếu là ảnh vinh danh (có prefix riêng), không đụng avatar cá nhân
+    if (!parsed.key.startsWith(HONORS_KEY_PREFIX)) return
+    await deleteObject(parsed.bucket, parsed.key)
+  } catch (e) {
+    console.warn('⚠️ Không xóa được ảnh vinh danh cũ:', e)
+  }
 }
 
 // ─── Header Map ───────────────────────────────────────────────────────────────
@@ -183,67 +199,67 @@ export async function POST(request: NextRequest) {
 
     const thangFromForm = (formData.get('thang') as string) || ''
 
-    // Upload top 3 images if provided
-    const topImages: Record<number, string> = {} // key: stt, value: url
-    if (isSupabaseS3Configured()) {
-      await ensureBucket()
-      const client = createSupabaseS3Client()
-      
-      for (let i = 1; i <= 3; i++) {
-        const fileKey = `top${i}Image`
-        const file = formData.get(fileKey)
-        if (file && typeof file !== 'string') {
-          if (file.type.startsWith('image/') && file.size <= MAX_IMAGE_BYTES) {
-            const buffer = Buffer.from(await file.arrayBuffer())
-            const ext = file.name.includes('.') ? file.name.split('.').pop() : 'jpg'
-            const key = `top-honors/${Date.now()}-${Math.random().toString(36).slice(2)}-top${i}.${ext}`
-            
-            await client.send(new PutObjectCommand({
-              Bucket: BUCKET_NAME,
-              Key: key,
-              Body: buffer,
-              ContentType: file.type || 'image/jpeg',
-            }))
-            
-            topImages[i] = makeProxyUrl(BUCKET_NAME, key)
-          }
+    // ─── Upload top 3 images ──────────────────────────────────────────────────
+    // topImages[i] = url, key = rank index (1,2,3) = thứ tự trong danh sách rows
+    const topImages: Record<number, string> = {}
+
+    for (let i = 1; i <= 3; i++) {
+      const imageFile = formData.get(`top${i}Image`)
+      if (!imageFile || typeof imageFile === 'string') continue
+      if (!imageFile.type.startsWith('image/')) continue
+      if (imageFile.size > MAX_IMAGE_BYTES) continue
+
+      if (isSupabaseS3Configured()) {
+        // Upload lên Supabase S3
+        try {
+          await ensureBucket()
+          const s3 = createSupabaseS3Client()
+          const buffer = Buffer.from(await imageFile.arrayBuffer())
+          const ext = imageFile.name.includes('.') ? imageFile.name.split('.').pop() : 'jpg'
+          const key = `${HONORS_KEY_PREFIX}top${i}-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+          await s3.send(new PutObjectCommand({
+            Bucket: BUCKET_NAME, Key: key,
+            Body: buffer, ContentType: imageFile.type || 'image/jpeg',
+          }))
+          topImages[i] = makeProxyUrl(BUCKET_NAME, key)
+          console.log(`✅ Uploaded top${i} avatar to S3: ${key}`)
+        } catch (e) {
+          console.error(`❌ S3 upload top${i} failed:`, e)
+          // Fallback base64 nếu S3 lỗi
+          try {
+            const buffer = Buffer.from(await imageFile.arrayBuffer())
+            topImages[i] = `data:${imageFile.type};base64,${buffer.toString('base64')}`
+            console.warn(`⚠️ top${i}: dùng base64 fallback do S3 lỗi`)
+          } catch {}
+        }
+      } else {
+        // S3 chưa cấu hình → base64
+        try {
+          const buffer = Buffer.from(await imageFile.arrayBuffer())
+          topImages[i] = `data:${imageFile.type};base64,${buffer.toString('base64')}`
+        } catch (e) {
+          console.error(`Base64 encode top${i} failed:`, e)
         }
       }
     }
 
     const client = await pool.connect()
     try {
-      // Tạo bảng nếu chưa có
+      // Migrate: thêm cột honors_avatar_url nếu chưa có
       await client.query(`
-        CREATE TABLE IF NOT EXISTS teacher_monthly_honors (
-          id SERIAL PRIMARY KEY,
-          stt INTEGER,
-          full_name VARCHAR(255) NOT NULL,
-          email VARCHAR(255),
-          khoi_day VARCHAR(100),
-          co_so VARCHAR(255),
-          thang VARCHAR(20) NOT NULL,
-          so_case INTEGER DEFAULT 0,
-          so_hoc_sinh INTEGER DEFAULT 0,
-          ti_le NUMERIC(5,2) DEFAULT 0,
-          loai VARCHAR(100),
-          thuong_cr NUMERIC(15,2) DEFAULT 0,
-          avatar_url TEXT,
-          imported_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          imported_by VARCHAR(255),
-          UNIQUE(email, thang)
-        );
-        CREATE INDEX IF NOT EXISTS idx_teacher_monthly_honors_thang
-          ON teacher_monthly_honors(thang, stt ASC);
-        CREATE INDEX IF NOT EXISTS idx_teacher_monthly_honors_email
-          ON teacher_monthly_honors(email);
+        ALTER TABLE teacher_monthly_honors ADD COLUMN IF NOT EXISTS honors_avatar_url TEXT;
+        ALTER TABLE teacher_monthly_honors ADD COLUMN IF NOT EXISTS slogan VARCHAR(255);
       `)
 
       let insertedCount = 0
       const errors: string[] = []
       const preview: Record<string, unknown>[] = []
+      let rowIndex = 0
 
       for (const row of rows) {
+        const rankIndex = rowIndex + 1  // 1-based
+        rowIndex++
+
         const thang = (row.thang || thangFromForm || '').trim()
         if (!thang) {
           errors.push(`Bỏ qua "${row.full_name}": thiếu tháng`)
@@ -253,36 +269,48 @@ export async function POST(request: NextRequest) {
         const email = (row.email || '').trim().toLowerCase()
         const stt = parseInt(row.stt || '0') || null
 
-        // Check if we have a custom image for this rank
-        let avatarUrl: string | null = null
-        if (stt && topImages[stt]) {
-          avatarUrl = topImages[stt]
-        } else if (email) {
-          // Fallback to teacher_avatars or app_users
-          // 1. Thử teacher_avatars trước
+        // ── honors_avatar_url: chỉ lưu ảnh do admin upload riêng cho vinh danh ──
+        const honorsAvatarUrl: string | null = topImages[rankIndex] || null
+
+        // Nếu import đè lên record cũ → xóa ảnh honors cũ trên S3 (nếu có và khác ảnh mới)
+        if (email && thang) {
+          try {
+            const existing = await client.query(
+              `SELECT honors_avatar_url FROM teacher_monthly_honors WHERE LOWER(email) = $1 AND thang = $2 LIMIT 1`,
+              [email, thang]
+            )
+            const oldHonorsUrl = existing.rows[0]?.honors_avatar_url || null
+            if (oldHonorsUrl && oldHonorsUrl !== honorsAvatarUrl) {
+              await deleteHonorsAvatarIfOwned(oldHonorsUrl)
+            }
+          } catch { /* skip */ }
+        }
+
+        // ── avatar_url hiển thị: ưu tiên ảnh vinh danh mới upload, fallback avatar cá nhân ──
+        let displayAvatarUrl: string | null = honorsAvatarUrl
+
+        if (!displayAvatarUrl && email) {
           try {
             const avatarRes = await client.query(
               `SELECT avatar_url FROM teacher_avatars WHERE LOWER(teacher_email) = $1 LIMIT 1`,
               [email]
             )
-            avatarUrl = avatarRes.rows[0]?.avatar_url || null
-          } catch {
-            // If teacher_avatars or avatar_url doesn't exist, skip
-          }
+            displayAvatarUrl = avatarRes.rows[0]?.avatar_url || null
+          } catch { /* skip */ }
 
-          // 2. Fallback: app_users (nếu user đăng nhập bằng email này)
-          if (!avatarUrl) {
+          if (!displayAvatarUrl) {
             try {
+              await client.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS avatar_url TEXT`)
               const userRes = await client.query(
                 `SELECT avatar_url FROM app_users WHERE LOWER(email) = $1 LIMIT 1`,
                 [email]
               )
-              avatarUrl = userRes.rows[0]?.avatar_url || null
-            } catch {
-              // If app_users or avatar_url doesn't exist, skip
-            }
+              displayAvatarUrl = userRes.rows[0]?.avatar_url || null
+            } catch { /* skip */ }
           }
         }
+
+        // KHÔNG ghi đè teacher_avatars — ảnh vinh danh chỉ thuộc về teacher_monthly_honors
 
         // Parse số liệu với format VN
         const tiLe = parsePercent(row.ti_le)
@@ -293,8 +321,9 @@ export async function POST(request: NextRequest) {
         try {
           await client.query(
             `INSERT INTO teacher_monthly_honors
-              (stt, full_name, email, khoi_day, co_so, thang, so_case, so_hoc_sinh, ti_le, loai, thuong_cr, avatar_url, imported_by)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+              (stt, full_name, email, khoi_day, co_so, thang, so_case, so_hoc_sinh, ti_le, loai, thuong_cr,
+               avatar_url, honors_avatar_url, imported_by)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
              ON CONFLICT (email, thang) DO UPDATE SET
                stt = EXCLUDED.stt,
                full_name = EXCLUDED.full_name,
@@ -306,16 +335,20 @@ export async function POST(request: NextRequest) {
                loai = EXCLUDED.loai,
                thuong_cr = EXCLUDED.thuong_cr,
                avatar_url = EXCLUDED.avatar_url,
+               honors_avatar_url = EXCLUDED.honors_avatar_url,
                imported_at = NOW(),
                imported_by = EXCLUDED.imported_by`,
             [stt, row.full_name, email || null, row.khoi_day || null, row.co_so || null,
-             thang, soCase, soHocSinh, tiLe, row.loai || null, thuongCr, avatarUrl, importedBy]
+             thang, soCase, soHocSinh, tiLe, row.loai || null, thuongCr,
+             displayAvatarUrl, honorsAvatarUrl, importedBy]
           )
           insertedCount++
           if (preview.length < 10) {
             preview.push({
               stt, full_name: row.full_name, co_so: row.co_so,
-              thang, ti_le: tiLe, avatar_url: avatarUrl,
+              thang, ti_le: tiLe,
+              avatar_url: displayAvatarUrl,
+              honors_avatar_url: honorsAvatarUrl,
             })
           }
         } catch (err) {

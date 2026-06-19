@@ -62,8 +62,10 @@ export function effectiveVideoCompletionFromRaw(
   // Tin tưởng trạng thái đã lưu khi không có heartbeat TMS.
   // Lý do: dữ liệu import từ Google Sheet hợp lệ — giáo viên đã học
   // trên edpuzzle trước khi có TMS, không có server_time/heartbeat.
+  // Cũng bao gồm: user vừa xem xong và saveCompletion đã lưu 'completed'
+  // (hasTmsWatchHeartbeat có thể chưa có nếu đây là lần mở video đầu tiên).
   if (raw === 'completed') {
-    return { completion_status: 'completed', completed_at: completedAtStr }
+    return { completion_status: 'completed', completed_at: completedAtStr ?? new Date().toISOString() }
   }
   if (raw === 'watched') {
     return { completion_status: 'watched', completed_at: completedAtStr }

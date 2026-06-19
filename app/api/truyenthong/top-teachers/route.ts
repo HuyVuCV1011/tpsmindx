@@ -41,7 +41,8 @@ export async function GET() {
                         full_name,
                         COALESCE(co_so, 'MindX') AS center,
                         CAST(ti_le AS FLOAT) AS total_score,
-                        avatar_url
+                        avatar_url,
+                        slogan
                     FROM teacher_monthly_honors
                     WHERE thang = $1
                     ORDER BY stt ASC NULLS LAST, ti_le DESC

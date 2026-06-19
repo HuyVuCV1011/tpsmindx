@@ -2323,51 +2323,6 @@ const migrations: Migration[] = [
     `,
   },
   {
-    name: 'V98_teacher_monthly_honors',
-    version: 98,
-    sql: `
-      CREATE TABLE IF NOT EXISTS teacher_monthly_honors (
-        id SERIAL PRIMARY KEY,
-        stt INTEGER,
-        full_name VARCHAR(255) NOT NULL,
-        email VARCHAR(255),
-        khoi_day VARCHAR(100),
-        co_so VARCHAR(255),
-        thang VARCHAR(20) NOT NULL,
-        so_case INTEGER DEFAULT 0,
-        so_hoc_sinh INTEGER DEFAULT 0,
-        ti_le NUMERIC(5,2) DEFAULT 0,
-        loai VARCHAR(100),
-        thuong_cr NUMERIC(15,2) DEFAULT 0,
-        avatar_url TEXT,
-        imported_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        imported_by VARCHAR(255),
-        UNIQUE(email, thang)
-      );
-      CREATE INDEX IF NOT EXISTS idx_teacher_monthly_honors_thang
-        ON teacher_monthly_honors(thang, stt ASC);
-      CREATE INDEX IF NOT EXISTS idx_teacher_monthly_honors_email
-        ON teacher_monthly_honors(email);
-    `,
-  },
-  {
-    name: 'V99_add_avatar_support',
-    version: 99,
-    sql: `
-      -- Create teacher_avatars table if it doesn't exist
-      CREATE TABLE IF NOT EXISTS teacher_avatars (
-        id SERIAL PRIMARY KEY,
-        teacher_email VARCHAR(255) NOT NULL UNIQUE,
-        avatar_url TEXT,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-      
-      -- Add avatar_url column to app_users if it doesn't exist
-      ALTER TABLE app_users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
-    `,
-  },
-  {
     name: 'V97_multi_email_accounts',
     version: 97,
     sql: `
@@ -2427,6 +2382,41 @@ const migrations: Migration[] = [
           CHECK (default_to_limit > 0),
         ADD COLUMN IF NOT EXISTS default_cc_limit INTEGER NOT NULL DEFAULT 2000
           CHECK (default_cc_limit > 0);
+    `,
+  },
+  {
+    name: 'V98_teacher_monthly_honors',
+    version: 98,
+    sql: `
+      CREATE TABLE IF NOT EXISTS teacher_monthly_honors (
+        id SERIAL PRIMARY KEY,
+        stt INTEGER,
+        full_name VARCHAR(255) NOT NULL,
+        email VARCHAR(255),
+        khoi_day VARCHAR(100),
+        co_so VARCHAR(255),
+        thang VARCHAR(20) NOT NULL,
+        so_case INTEGER DEFAULT 0,
+        so_hoc_sinh INTEGER DEFAULT 0,
+        ti_le NUMERIC(5,2) DEFAULT 0,
+        loai VARCHAR(100),
+        thuong_cr NUMERIC(15,2) DEFAULT 0,
+        avatar_url TEXT,
+        imported_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        imported_by VARCHAR(255),
+        UNIQUE(email, thang)
+      );
+      CREATE INDEX IF NOT EXISTS idx_teacher_monthly_honors_thang
+        ON teacher_monthly_honors(thang, stt ASC);
+      CREATE INDEX IF NOT EXISTS idx_teacher_monthly_honors_email
+        ON teacher_monthly_honors(email);
+    `,
+  },
+  {
+    name: 'V99_add_avatar_url_to_app_users',
+    version: 99,
+    sql: `
+      ALTER TABLE app_users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
     `,
   },
 ]

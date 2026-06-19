@@ -74,7 +74,7 @@ function HonorsTab({ onOpenPopup }: { onOpenPopup?: () => void }) {
     }
 
     return (
-        <div className="absolute inset-0 flex flex-col overflow-y-auto">
+        <div className="flex flex-col overflow-y-auto h-full">
 
             {/* ── TOP 1 HERO CARD ── */}
             <div className="mx-3.5 mt-3.5 mb-0 relative rounded-2xl overflow-hidden flex-shrink-0 group cursor-default"
@@ -102,28 +102,28 @@ function HonorsTab({ onOpenPopup }: { onOpenPopup?: () => void }) {
                 <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/30 backdrop-blur-sm border border-white/10">
                     <Star className="w-2.5 h-2.5 fill-amber-300 text-amber-300" />
                     <span className="text-[10px] font-black text-white tabular-nums">
-                        {top1 ? Number(top1.total_score).toFixed(1) : '—'}
+                        {top1 ? Number(top1.total_score).toFixed(1) + '%' : '—'}
                     </span>
                 </div>
 
                 <div className="px-4 pt-8 pb-5 text-center relative z-10">
                     {/* Avatar with ring */}
-                    <div className="relative inline-flex items-center justify-center mb-3">
+                    <div className="relative inline-flex items-center justify-center mb-4">
                         {/* Glow ring */}
-                        <div className="absolute inset-0 rounded-full scale-125 opacity-30"
-                            style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.6) 0%, transparent 70%)' }} />
-                        <div className="w-[60px] h-[60px] rounded-full overflow-hidden border-2 border-white/25 shadow-xl flex items-center justify-center relative z-10"
+                        <div className="absolute inset-0 rounded-full scale-150 opacity-40 animate-pulse"
+                            style={{ background: 'radial-gradient(circle, rgba(255,215,0,0.4) 0%, transparent 70%)' }} />
+                        <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white/30 shadow-2xl flex items-center justify-center relative z-10 ring-4 ring-amber-400/20"
                             style={{ background: '#a83830' }}>
                             {top1?.avatar_url
                                 ? <img src={top1.avatar_url} alt={top1.full_name} className="w-full h-full object-cover" />
-                                : <span className="text-white font-black text-xl tracking-tight">
+                                : <span className="text-white font-black text-2xl tracking-tight">
                                     {top1 ? getInitials(top1.full_name) : '?'}
-                                  </span>
+                                </span>
                             }
                         </div>
                         {/* Crown */}
-                        <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-20">
-                            <Crown className="w-5 h-5 text-amber-300 fill-amber-400/50 drop-shadow-md" />
+                        <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-20">
+                            <Crown className="w-7 h-7 text-amber-300 fill-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
                         </div>
                     </div>
 
@@ -159,13 +159,13 @@ function HonorsTab({ onOpenPopup }: { onOpenPopup?: () => void }) {
                         </div>
 
                         {/* Avatar */}
-                        <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center shrink-0 border border-red-100/50"
+                        <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center shrink-0 border-2 border-white shadow-sm ring-1 ring-red-100"
                             style={{ background: `linear-gradient(135deg, ${fromColor}, ${toColor})` }}>
                             {teacher?.avatar_url
                                 ? <img src={teacher.avatar_url} alt={teacher.full_name} className="w-full h-full object-cover" />
-                                : <span className="text-white font-black text-[9px]">
+                                : <span className="text-white font-black text-[11px]">
                                     {teacher ? getInitials(teacher.full_name) : '?'}
-                                  </span>
+                                </span>
                             }
                         </div>
 
@@ -181,7 +181,7 @@ function HonorsTab({ onOpenPopup }: { onOpenPopup?: () => void }) {
                         <div className="flex items-center gap-1 shrink-0">
                             <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                             <span className="text-[11px] font-black text-gray-600 tabular-nums">
-                                {teacher ? Number(teacher.total_score).toFixed(1) : '—'}
+                                {teacher ? Number(teacher.total_score).toFixed(1) + '%' : '—'}
                             </span>
                         </div>
                     </div>
@@ -266,11 +266,11 @@ export default function SliderSidebar({ posts, onOpenPopup }: { posts: Post[]; o
             </div>
 
             {/* Tab Content */}
-            <div className="flex-1 min-h-0 overflow-hidden relative">
+            <div className="flex-1 min-h-0 overflow-hidden relative grid grid-cols-1 grid-rows-1">
                 {/* Đang hot — KHÔNG THAY ĐỔI */}
                 <div className={cn(
-                    "absolute inset-0 p-4 space-y-2.5 transition-all duration-300 overflow-y-auto",
-                    activeTab === 'hot' ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-full pointer-events-none"
+                    "col-start-1 row-start-1 p-4 space-y-2.5 transition-all duration-300 overflow-y-auto",
+                    activeTab === 'hot' ? "opacity-100 translate-x-0 z-10" : "opacity-0 -translate-x-full pointer-events-none z-0"
                 )}>
                     {posts.map((post, index) => (
                         <Link
@@ -312,8 +312,8 @@ export default function SliderSidebar({ posts, onOpenPopup }: { posts: Post[]; o
 
                 {/* Vinh danh */}
                 <div className={cn(
-                    "absolute inset-0 flex flex-col transition-all duration-300",
-                    activeTab === 'honors' ? "opacity-100 translate-x-0" : "opacity-0 translate-x-full pointer-events-none"
+                    "col-start-1 row-start-1 flex flex-col transition-all duration-300",
+                    activeTab === 'honors' ? "opacity-100 translate-x-0 z-10" : "opacity-0 translate-x-full pointer-events-none z-0"
                 )}>
                     <HonorsTab onOpenPopup={onOpenPopup} />
                 </div>

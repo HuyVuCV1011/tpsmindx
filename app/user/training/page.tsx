@@ -277,6 +277,26 @@ export default function TrainingPage() {
 
   const teacher = teacherData?.teacher || null
 
+  // Force-revalidate khi lesson page đã lưu completion (bypass dedupingInterval)
+  useEffect(() => {
+    if (!submitCode || !teacherProfile?.code) return
+
+    const flag = sessionStorage.getItem('training_completion_invalidate')
+    if (!flag) return
+
+    // Xóa flag trước để tránh loop
+    sessionStorage.removeItem('training_completion_invalidate')
+
+    // Force revalidate bypass dedup — truyền undefined data + revalidate: true
+    mutate(`/api/training-db?code=${submitCode}`, undefined, { revalidate: true })
+    mutate(
+      `/api/training-assignments?status=published&teacher_code=${teacherProfile.code}`,
+      undefined,
+      { revalidate: true },
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]) // pathname thay đổi = user vừa navigate về trang này
+
   // Refetch khi pathname thay đổi (user navigate về /user/dao-tao-nang-cao từ lesson page)
   useEffect(() => {
     refetchTrainingData()
@@ -286,12 +306,24 @@ export default function TrainingPage() {
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState !== 'visible') return
+      // Check completion flag khi tab focus lại
+      const flag = sessionStorage.getItem('training_completion_invalidate')
+      if (flag && submitCode && teacherProfile?.code) {
+        sessionStorage.removeItem('training_completion_invalidate')
+        mutate(`/api/training-db?code=${submitCode}`, undefined, { revalidate: true })
+        mutate(
+          `/api/training-assignments?status=published&teacher_code=${teacherProfile.code}`,
+          undefined,
+          { revalidate: true },
+        )
+        return
+      }
       refetchTrainingData()
     }
     document.addEventListener('visibilitychange', handleVisibility)
     return () =>
       document.removeEventListener('visibilitychange', handleVisibility)
-  }, [refetchTrainingData])
+  }, [mutate, refetchTrainingData, submitCode, teacherProfile?.code])
 
   const { data: trainingData, isLoading: isLoadingTraining } = useSWR<TrainingData>(
     teacher && user ? `/api/training-db?code=${submitCode}` : null,
@@ -310,7 +342,7 @@ export default function TrainingPage() {
     secureFetcher,
     {
       revalidateOnFocus: true,
-      dedupingInterval: 30000,
+      dedupingInterval: 5000,
     },
   )
   const completedLessons = useMemo(() => {

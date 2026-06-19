@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { UpcomingEventsSidebar } from '@/components/upcoming-events-sidebar'
 import { useSidebar } from '@/lib/sidebar-context'
-import { TeacherHonorsPopup } from '@/components/teacher-honors-popup'
+import TeacherHonorsPopup from '@/components/teacher-honors-popup'
 
 // Skeleton Imports (Inline for simplicity or import if available)
 import { PostCardSkeleton } from '@/components/skeletons'
@@ -74,6 +74,32 @@ export default function CommunicationsPage() {
     const [selectedFilter, setSelectedFilter] = useState<string>('all')
     const [searchQuery, setSearchQuery] = useState('')
     const [isPopupOpen, setIsPopupOpen] = useState(false)
+
+  // Auto-open popup on first visit, re-open every week
+  useEffect(() => {
+    const KEY = 'tms_honors_popup_seen_at'
+    try {
+      const seenAt = localStorage.getItem(KEY)
+
+      const getWeeklyCycleId = (ts: number) => {
+        const d = new Date(ts)
+        // Tính toán ID dựa trên số tuần kể từ epoch (Unix time)
+        // 604800000 ms = 7 ngày
+        return Math.floor(ts / 604800000)
+      }
+
+      const currentCycle = getWeeklyCycleId(Date.now())
+      const seenCycle = seenAt ? getWeeklyCycleId(Number(seenAt)) : null
+      const shouldShow = seenCycle === null || seenCycle < currentCycle
+
+      if (shouldShow) {
+        const timer = setTimeout(() => setIsPopupOpen(true), 1200)
+        return () => clearTimeout(timer)
+      }
+    } catch {
+      // localStorage unavailable — skip auto-open
+    }
+  }, [])
   // Handle URL filter parameter
   useEffect(() => {
     const filterParam = searchParams.get('filter')
@@ -138,7 +164,12 @@ export default function CommunicationsPage() {
         <TeacherHonorsPopup
           isOpen={isPopupOpen}
           onOpen={() => setIsPopupOpen(true)}
-          onClose={() => setIsPopupOpen(false)}
+          onClose={() => {
+            setIsPopupOpen(false)
+            try {
+              localStorage.setItem('tms_honors_popup_seen_at', String(Date.now()))
+            } catch { /* ignore */ }
+          }}
         />
 
         {/* Header Section - Now after slider */}
