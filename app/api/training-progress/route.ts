@@ -29,6 +29,21 @@ export const POST = withApiProtection(async (request: NextRequest) => {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
+    // Resolve canonical code và email prefix từ teachers table
+    const resolveRes = await pool.query(
+      `SELECT LOWER(TRIM(code)) AS canonical_code, LOWER(TRIM(user_name)) AS user_name
+       FROM teachers
+       WHERE LOWER(TRIM(code)) = $1
+          OR LOWER(TRIM(user_name)) = $1
+          OR LOWER(SPLIT_PART(work_email, '@', 1)) = $1
+       LIMIT 1`,
+      [teacherCode],
+    );
+    const resolvedRow = resolveRes.rows[0];
+    const canonicalCode = resolvedRow?.canonical_code || teacherCode;
+    const emailPrefixCode = resolvedRow?.user_name || teacherCode;
+    const allTeacherCodes = [...new Set([canonicalCode, emailPrefixCode, teacherCode])].filter(Boolean);
+
     const denied = await rejectIfDatasourceLookupForbidden(
       auth.sessionEmail,
       Boolean(auth.resolvedAccess.isAdmin),
@@ -45,8 +60,8 @@ export const POST = withApiProtection(async (request: NextRequest) => {
           `SELECT time_spent_seconds, server_time_seconds, completion_status,
                   last_heartbeat_at, first_viewed_at
            FROM training_teacher_video_scores
-           WHERE LOWER(TRIM(teacher_code)) = $1 AND video_id = $2`,
-          [teacherCode, videoId]
+           WHERE LOWER(TRIM(teacher_code)) = ANY($1::text[]) AND video_id = $2`,
+          [allTeacherCodes, videoId]
         ),
         client.query(
           `SELECT duration_minutes, duration_seconds FROM training_videos WHERE id = $1`,
@@ -145,7 +160,7 @@ export const POST = withApiProtection(async (request: NextRequest) => {
                   COALESCE(NULLIF(main_centre,''),NULL) AS center,
                   COALESCE(NULLIF(course_line,''),NULL) AS teaching_block
            FROM teachers WHERE code = $1 LIMIT 1`,
-          [teacherCode]
+          [canonicalCode]
         );
         const t = teacherInfo.rows[0] || null;
         await client.query(
@@ -159,7 +174,7 @@ export const POST = withApiProtection(async (request: NextRequest) => {
              center         = COALESCE(NULLIF(EXCLUDED.center,''), training_teacher_stats.center),
              teaching_block = COALESCE(NULLIF(EXCLUDED.teaching_block,''), training_teacher_stats.teaching_block),
              updated_at     = NOW()`,
-          [teacherCode, t?.full_name || teacherCode, t?.username || null,
+          [canonicalCode, t?.full_name || canonicalCode, t?.username || null,
            t?.work_email || '', t?.center || null, t?.teaching_block || null]
         );
       } catch { /* non-blocking */ }
@@ -200,7 +215,7 @@ export const POST = withApiProtection(async (request: NextRequest) => {
            END,
            updated_at = NOW()
          RETURNING *`,
-        [teacherCode, videoId, clampedServerTime, statusParam, now]
+        [canonicalCode, videoId, clampedServerTime, statusParam, now]
       );
 
       return NextResponse.json({ success: true, data: result.rows[0] });
@@ -223,11 +238,26 @@ export const GET = withApiProtection(async (request: NextRequest) => {
   }
 
   try {
+    // Resolve canonical code và email prefix từ teachers table
+    const resolveRes = await pool.query(
+      `SELECT LOWER(TRIM(code)) AS canonical_code, LOWER(TRIM(user_name)) AS user_name
+       FROM teachers
+       WHERE LOWER(TRIM(code)) = $1
+          OR LOWER(TRIM(user_name)) = $1
+          OR LOWER(SPLIT_PART(work_email, '@', 1)) = $1
+       LIMIT 1`,
+      [teacherCode],
+    );
+    const resolvedRow = resolveRes.rows[0];
+    const canonicalCode = resolvedRow?.canonical_code || teacherCode;
+    const emailPrefixCode = resolvedRow?.user_name || teacherCode;
+    const allTeacherCodes = [...new Set([canonicalCode, emailPrefixCode, teacherCode])].filter(Boolean);
+
     const result = await pool.query(
       `SELECT time_spent_seconds, server_time_seconds, completion_status, last_heartbeat_at
        FROM training_teacher_video_scores
-       WHERE LOWER(TRIM(teacher_code)) = $1 AND video_id = $2`,
-      [teacherCode, videoId]
+       WHERE LOWER(TRIM(teacher_code)) = ANY($1::text[]) AND video_id = $2`,
+      [allTeacherCodes, videoId]
     );
 
     if (result.rows.length === 0) {

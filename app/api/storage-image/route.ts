@@ -114,9 +114,11 @@ export async function GET(request: NextRequest) {
       return new NextResponse('Storage not configured', { status: 500 });
     }
 
+    const isVideo = /\.(mp4|webm|ogg|mov|avi|mkv)$/i.test(key);
     // Keep legacy proxy=1 URLs working, but prefer direct storage delivery.
     // stream=1 is reserved for diagnostics when signed URLs are unavailable.
-    const forceStream = searchParams.get('stream') === '1';
+    // Force proxy streaming for videos to avoid Range request/seeking issues over 307 redirects.
+    const forceStream = searchParams.get('stream') === '1' || isVideo;
     if (!forceStream) {
       const signedRedirectTtl =
         SIGNED_REDIRECT_BUCKET_TTLS.get(bucket) ?? DEFAULT_SIGNED_REDIRECT_TTL;
@@ -128,7 +130,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const isVideo = /\.(mp4|webm|ogg|mov|avi|mkv)$/i.test(key);
     const rangeHeader = request.headers.get('range');
     const client = createSupabaseS3Client();
     const getObjectParams: any = { Bucket: bucket, Key: key };
@@ -136,7 +137,12 @@ export async function GET(request: NextRequest) {
       getObjectParams.Range = rangeHeader;
     }
 
-    const result = await client.send(new GetObjectCommand(getObjectParams));
+    const result = await client.send(
+      new GetObjectCommand(getObjectParams),
+      // Abort the S3 download if the browser closes the connection
+      // (e.g., during video seeking or page navigation).
+      { abortSignal: request.signal },
+    );
     if (!result.Body) {
       return new NextResponse('Not found', { status: 404 });
     }
@@ -163,6 +169,14 @@ export async function GET(request: NextRequest) {
       headers,
     });
   } catch (error: any) {
+    // Client disconnected (e.g., video seek, page navigation) — silent, not an error.
+    if (
+      error?.name === 'AbortError' ||
+      error?.name === 'RequestAbortedError' ||
+      error?.code === 'ERR_ABORTED'
+    ) {
+      return new NextResponse(null, { status: 499 });
+    }
     if (error?.name === 'InvalidRange' || error?.$metadata?.httpStatusCode === 416) {
       return new NextResponse('Range Not Satisfiable', { status: 416 });
     }
