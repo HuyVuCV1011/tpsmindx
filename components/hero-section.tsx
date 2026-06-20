@@ -21,9 +21,10 @@ interface Post {
 interface HeroSectionProps {
     posts: Post[]
     trendingPosts: Post[]
+    onOpenPopup?: () => void
 }
 
-export default function HeroSection({ posts, trendingPosts }: HeroSectionProps) {
+export default function HeroSection({ posts, trendingPosts, onOpenPopup }: HeroSectionProps) {
     const sliderRef = useRef<HTMLDivElement>(null)
     const sidebarRef = useRef<HTMLDivElement>(null)
     const [sliderHeight, setSliderHeight] = useState<number | null>(null)
@@ -68,7 +69,7 @@ export default function HeroSection({ posts, trendingPosts }: HeroSectionProps) 
                         height: sliderHeight && window.innerWidth >= 1024 ? `${sliderHeight}px` : 'auto'
                     }}
                 >
-                    <SliderSidebar posts={trendingPosts} />
+                    <SliderSidebar posts={trendingPosts} onOpenPopup={onOpenPopup} />
                 </div>
             </div>
         </section>
