@@ -2385,8 +2385,43 @@ const migrations: Migration[] = [
     `,
   },
   {
-    name: 'V98_exam_feedback_reviews',
+    name: 'V98_teacher_monthly_honors',
     version: 98,
+    sql: `
+      CREATE TABLE IF NOT EXISTS teacher_monthly_honors (
+        id SERIAL PRIMARY KEY,
+        stt INTEGER,
+        full_name VARCHAR(255) NOT NULL,
+        email VARCHAR(255),
+        khoi_day VARCHAR(100),
+        co_so VARCHAR(255),
+        thang VARCHAR(20) NOT NULL,
+        so_case INTEGER DEFAULT 0,
+        so_hoc_sinh INTEGER DEFAULT 0,
+        ti_le NUMERIC(5,2) DEFAULT 0,
+        loai VARCHAR(100),
+        thuong_cr NUMERIC(15,2) DEFAULT 0,
+        avatar_url TEXT,
+        imported_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        imported_by VARCHAR(255),
+        UNIQUE(email, thang)
+      );
+      CREATE INDEX IF NOT EXISTS idx_teacher_monthly_honors_thang
+        ON teacher_monthly_honors(thang, stt ASC);
+      CREATE INDEX IF NOT EXISTS idx_teacher_monthly_honors_email
+        ON teacher_monthly_honors(email);
+    `,
+  },
+  {
+    name: 'V99_add_avatar_url_to_app_users',
+    version: 99,
+    sql: `
+      ALTER TABLE app_users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+    `,
+  },
+  {
+    name: 'V100_exam_feedback_reviews',
+    version: 100,
     sql: `
       CREATE TABLE IF NOT EXISTS exam_feedback_reviews (
         id BIGSERIAL PRIMARY KEY,
@@ -2449,8 +2484,8 @@ const migrations: Migration[] = [
     `,
   },
   {
-    name: 'V99_push_subscriptions',
-    version: 99,
+    name: 'V101_push_subscriptions',
+    version: 101,
     sql: `
       CREATE TABLE IF NOT EXISTS push_subscriptions (
         id BIGSERIAL PRIMARY KEY,

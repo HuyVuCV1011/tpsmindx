@@ -72,14 +72,14 @@ export default function TabOfficeHours() {
   const [officeHours, setOfficeHours] = useState<OfficeHour[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedOH, setSelectedOH] = useState<OfficeHour | null>(null)
-  
+
   // Filters
   const [selectedCentres, setSelectedCentres] = useState<string[]>([])
   const [centreSearchTerm, setCentreSearchTerm] = useState('')
   const [dateFrom, setDateFrom] = useState<string>('')
   const [dateTo, setDateTo] = useState<string>('')
   const [appointmentStatus, setAppointmentStatus] = useState<'all' | AppointmentStatus>('all')
-  
+
   // Available centres list - fetch from LMS or hardcode
   const allCentres = [
     { id: '63034f4a7d1d1e1cb14e4e57', name: 'HCM - 322 Tây Thạnh', shortName: '322TT' },
@@ -90,12 +90,12 @@ export default function TabOfficeHours() {
     { id: '5ddf9e6b16dbf70374a88ef6', name: 'HN - Ngọc Khánh', shortName: 'NK' },
     // Add more centres as needed
   ]
-  
-  const filteredCentres = allCentres.filter(centre => 
+
+  const filteredCentres = allCentres.filter(centre =>
     centre.name.toLowerCase().includes(centreSearchTerm.toLowerCase()) ||
     centre.shortName.toLowerCase().includes(centreSearchTerm.toLowerCase())
   )
-  
+
   const toastShownRef = useRef(false)
 
   useEffect(() => {
@@ -104,7 +104,7 @@ export default function TabOfficeHours() {
     const year = now.getFullYear()
     const month = String(now.getMonth() + 1).padStart(2, '0')
     setDateFrom(`${year}-${month}-01`)
-    
+
     // Last day of month
     const lastDay = new Date(year, now.getMonth() + 1, 0).getDate()
     setDateTo(`${year}-${month}-${lastDay}`)
@@ -112,7 +112,7 @@ export default function TabOfficeHours() {
 
   const fetchOfficeHours = async () => {
     const teacherUsername = teacherProfile?.code
-    
+
     if (!teacherUsername) {
       if (!toastShownRef.current) {
         toast.error('Không tìm thấy mã giáo viên. Vui lòng liên hệ quản trị viên.')
@@ -128,24 +128,24 @@ export default function TabOfficeHours() {
 
     try {
       setLoading(true)
-      
+
       // Build query params
       const params = new URLSearchParams({
         username: teacherUsername,
         dateFrom: dateFrom,
         dateTo: dateTo,
       })
-      
+
       if (selectedCentres.length > 0) {
         params.append('centres', selectedCentres.join(','))
       }
-      
+
       if (appointmentStatus !== 'all') {
         params.append('appointmentStatus', appointmentStatus)
       }
-      
+
       const url = `/api/user/office-hours?${params.toString()}`
-      
+
       const response = await fetch(url, {
         headers: authHeaders(token),
         credentials: 'include',
@@ -258,7 +258,7 @@ export default function TabOfficeHours() {
               {loading ? 'Đang tải...' : 'Tải dữ liệu'}
             </button>
           </div>
-          
+
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {/* Centres Multi-Select */}
             <div>
@@ -436,9 +436,9 @@ export default function TabOfficeHours() {
                   const start = formatDateTime(oh.startTime)
                   const end = formatDateTime(oh.endTime)
                   const summary = getAppointmentSummary(oh.appointments || [])
-                  
+
                   return (
-                    <TableRow 
+                    <TableRow
                       key={`oh-${oh.id}-${oh.createdAt}-${index}`}
                       className="cursor-pointer hover:bg-gray-50"
                       onClick={() => setSelectedOH(oh)}

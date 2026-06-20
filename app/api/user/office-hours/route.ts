@@ -91,13 +91,13 @@ export async function GET(request: NextRequest) {
   }
 
   const firebaseToken = request.cookies.get('lms_firebase_token')?.value || '';
-  
+
   if (!firebaseToken) {
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: false,
-      noLmsToken: true, 
+      noLmsToken: true,
       officeHours: [],
-      message: 'Tài khoản này không có kết nối LMS.' 
+      message: 'Tài khoản này không có kết nối LMS.'
     });
   }
 
@@ -108,32 +108,32 @@ export async function GET(request: NextRequest) {
     const dateFromParam = searchParams.get('dateFrom');
     const dateToParam = searchParams.get('dateTo');
     const centresParam = searchParams.get('centres');
-    
+
     if (!username) {
-      return NextResponse.json({ 
-        success: false, 
-        officeHours: [], 
-        message: 'Thiếu username.' 
+      return NextResponse.json({
+        success: false,
+        officeHours: [],
+        message: 'Thiếu username.'
       }, { status: 400 });
     }
 
     if (!dateFromParam || !dateToParam) {
-      return NextResponse.json({ 
-        success: false, 
-        officeHours: [], 
-        message: 'Thiếu thông tin thời gian.' 
+      return NextResponse.json({
+        success: false,
+        officeHours: [],
+        message: 'Thiếu thông tin thời gian.'
       }, { status: 400 });
     }
 
     const authHeader = `Bearer ${firebaseToken}`;
-    
+
     // Convert dates to ISO format for LMS API
     const timeFrom = new Date(dateFromParam + 'T00:00:00.000Z').toISOString();
     const timeTo = new Date(dateToParam + 'T23:59:59.999Z').toISOString();
-    
+
     const centreShortNames = centresParam ? centresParam.split(',') : [];
-    
-    let allFilteredOfficeHours: any[] = [];
+
+    const allFilteredOfficeHours: any[] = [];
     let page = 0;
     const itemsPerPage = 100;
     const maxPages = 20; // Limit to prevent timeout
@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
           variables: { payload },
           operationName: "GetOfficeHours",
         }, authHeader);
-        
+
         const officeHoursData = result.data?.officeHours?.data || [];
         const total = result.data?.officeHours?.pagination?.total || 0;
 
@@ -166,13 +166,13 @@ export async function GET(request: NextRequest) {
           const teacherUsername = oh.teacher?.username?.toLowerCase();
           const teacherCode = oh.teacher?.code?.toLowerCase();
           const matchesTeacher = teacherUsername === username.toLowerCase() || teacherCode === username.toLowerCase();
-          
+
           // If centre filters specified, also check centre
           if (matchesTeacher && centreShortNames.length > 0) {
             const ohCentreShortName = oh.centre?.shortName;
             return centreShortNames.includes(ohCentreShortName);
           }
-          
+
           return matchesTeacher;
         });
 
@@ -189,17 +189,17 @@ export async function GET(request: NextRequest) {
 
       } catch (fetchError: any) {
         console.error(`[office-hours] Error fetching page ${page}:`, fetchError.message);
-        
+
         // If it's the first page and we get an error, return error response
         if (page === 0) {
-          return NextResponse.json({ 
-            success: false, 
-            officeHours: [], 
+          return NextResponse.json({
+            success: false,
+            officeHours: [],
             message: 'Lỗi khi lấy dữ liệu Office Hours từ LMS.',
-            error: fetchError.message 
+            error: fetchError.message
           });
         }
-        
+
         // If we already have some data, break and return what we have
         break;
       }
@@ -209,11 +209,11 @@ export async function GET(request: NextRequest) {
 
   } catch (error: any) {
     console.error('[office-hours] Error:', error?.message || error);
-    return NextResponse.json({ 
-      success: false, 
+    return NextResponse.json({
+      success: false,
       officeHours: [],
       message: 'Không thể kết nối đến LMS API.',
-      error: error?.message 
+      error: error?.message
     }, { status: 500 });
   }
 }

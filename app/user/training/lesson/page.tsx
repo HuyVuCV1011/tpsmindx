@@ -207,6 +207,11 @@ function LessonContent() {
           totalDuration: time, // Send total duration to update metadata
         }),
       })
+      // Signal training page để force-revalidate assignments cache
+      // (tránh SWR dedupingInterval chặn refetch sau khi xem xong video)
+      try {
+        sessionStorage.setItem('training_completion_invalidate', `${id}:${Date.now()}`)
+      } catch { /* ignore */ }
     } catch (err) {
       console.error('[Lesson] Failed to save completion:', err)
     }

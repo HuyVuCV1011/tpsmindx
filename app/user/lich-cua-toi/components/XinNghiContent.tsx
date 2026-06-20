@@ -276,6 +276,8 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
   const { teacherProfile } = useTeacher()
   const searchParams = useSearchParams()
   const campusPickerRef = useRef<HTMLDivElement | null>(null)
+  const dateDropdownRef = useRef<HTMLDivElement | null>(null)
+  const [showDateDropdown, setShowDateDropdown] = useState(false)
 
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
   const [campusFilter, setCampusFilter] = useState<string[]>([])
@@ -358,14 +360,14 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
           dateStr = raw.slice(0, 10)
         }
       }
-      
+
       if (!dateStr || dateStr.length !== 10) return false
-      
+
       const startHm = slotHhMm(slot.startTime)   // "HH:MM"
       const slotDateTime = new Date(`${dateStr}T${startHm}:00+07:00`)
-      
+
       if (isNaN(slotDateTime.getTime())) return false
-      
+
       const diffHours = (slotDateTime.getTime() - Date.now()) / (1000 * 60 * 60)
       return diffHours >= MIN_ADVANCE_HOURS
     } catch {
@@ -376,13 +378,13 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
   // Danh sách lớp duy nhất (dedup theo className), chỉ lấy lớp có slot tương lai
   const lmsRunningClasses = useMemo(() => {
     if (lmsSlots.length === 0) return []
-    
+
     // Tính ngày hiện tại tại VN (midnight)
     const now = new Date()
     const vnStr = now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' })
     const todayVN = new Date(vnStr)
     todayVN.setHours(0, 0, 0, 0)
-    
+
     // Debug: xem format của slot đầu tiên
     const sample = lmsSlots[0]
     console.log('[XinNghi] sample slot:', JSON.stringify({ date: sample?.date, className: sample?.className, startTime: sample?.startTime, status: sample?.status }))
@@ -392,23 +394,23 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
     let processedCount = 0
     let runningCount = 0
     let futureCount = 0
-    
+
     for (const s of lmsSlots) {
       processedCount++
-      
+
       // Chỉ lấy lớp RUNNING
       if (s.status !== 'RUNNING') {
         if (processedCount <= 3) console.log(`[XinNghi] skip slot ${processedCount}: status=${s.status} (not RUNNING)`)
         continue
       }
       runningCount++
-      
+
       const name = s.className?.trim()
       if (!name) {
         if (processedCount <= 3) console.log(`[XinNghi] skip slot ${processedCount}: no className`)
         continue
       }
-      
+
       // Parse date — hỗ trợ cả ISO timestamp và YYYY-MM-DD
       let dateStr = ''
       if (s.date) {
@@ -423,30 +425,30 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
           dateStr = raw.slice(0, 10)
         }
       }
-      
+
       if (!dateStr || dateStr.length !== 10) {
         if (processedCount <= 3) console.log(`[XinNghi] skip slot ${processedCount}: invalid date from ${s.date}`)
         continue
       }
-      
+
       // Parse as local date in VN timezone
       const slotDate = new Date(dateStr + 'T00:00:00+07:00')
       if (isNaN(slotDate.getTime())) {
         if (processedCount <= 3) console.log('[XinNghi] invalid date:', dateStr)
         continue
       }
-      
+
       // So sánh chỉ theo ngày (bỏ qua giờ)
       const slotDateOnly = new Date(slotDate)
       slotDateOnly.setHours(0, 0, 0, 0)
-      
+
       if (slotDateOnly < todayVN) {
         if (processedCount <= 3) console.log('[XinNghi] skipping past slot:', dateStr, 'slotDate:', slotDateOnly.toISOString(), 'vs todayVN:', todayVN.toISOString())
         continue
       }
-      
+
       futureCount++
-      
+
       if (!map.has(name)) {
         map.set(name, {
           classId: s.classId || name,
@@ -465,15 +467,15 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
   // Danh sách slots tương lai của lớp đang được chọn với số buổi được tính
   const selectedClassFutureSlots = useMemo(() => {
     if (!selectedLmsClassName) return []
-    
+
     const now = Date.now()
-    
+
     // Lấy TẤT CẢ slots của lớp và group theo ngày trước
     const dateMap = new Map<string, { date: string; slots: typeof lmsSlots }>()
-    
+
     for (const s of lmsSlots) {
       if (s.className?.trim() !== selectedLmsClassName.trim()) continue
-      
+
       // Parse date
       let dateStr = ''
       if (s.date) {
@@ -487,36 +489,36 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
           dateStr = raw.slice(0, 10)
         }
       }
-      
+
       if (!dateStr || dateStr.length !== 10) continue
-      
+
       if (!dateMap.has(dateStr)) {
         dateMap.set(dateStr, { date: dateStr, slots: [] })
       }
       dateMap.get(dateStr)!.slots.push(s)
     }
-    
+
     // Sort các ngày unique
     const sortedDates = Array.from(dateMap.keys()).sort()
-    
+
     console.log(`[XinNghi] Class ${selectedLmsClassName} has ${sortedDates.length} unique dates`)
-    
+
     // Tính số buổi cho mỗi ngày
     const result: Array<LmsClassSlot & { sessionNumber: number }> = []
-    
+
     for (let i = 0; i < sortedDates.length; i++) {
       const dateStr = sortedDates[i]
       const sessionNumber = i + 1 // Buổi thứ mấy = index + 1
       const dateData = dateMap.get(dateStr)!
-      
+
       // Lấy slot đầu tiên của ngày đó (hoặc slot có sessionHour lớn nhất)
       const slots = dateData.slots.sort((a, b) => (b.sessionHour ?? 0) - (a.sessionHour ?? 0))
       const representativeSlot = slots[0]
-      
+
       // Kiểm tra xem ngày này có trong tương lai không
       const startHm = slotHhMm(representativeSlot.startTime)
       const slotDateTime = new Date(`${dateStr}T${startHm}:00+07:00`)
-      
+
       if (slotDateTime.getTime() > now) {
         result.push({
           ...representativeSlot,
@@ -525,7 +527,7 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
         })
       }
     }
-    
+
     // Debug
     if (result.length > 0) {
       console.log('[XinNghi] selectedClassFutureSlots sample:', result.slice(0, 5).map(s => ({
@@ -534,7 +536,7 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
         startTime: s.startTime,
       })))
     }
-    
+
     return result
   }, [lmsSlots, selectedLmsClassName])
 
@@ -545,10 +547,10 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
   // Fetch lớp ngay khi component mount (khi vào tab "Xin nghỉ")
   useEffect(() => {
     if (!user?.email || lmsLoadedOnce) return // Chỉ load 1 lần
-    
+
     let cancelled = false
     setLmsLoading(true)
-    
+
     // Hiển thị toast thông báo (chỉ 1 lần)
     if (!toastShownRef.current) {
       toast.info('Đang tải danh sách lớp từ LMS...', { duration: 2000 })
@@ -604,7 +606,7 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
           end.setDate(start.getDate() + 6)
           return { from: start.toISOString().split('T')[0], to: end.toISOString().split('T')[0] }
         })
-        
+
         console.log(`[XinNghi] fetching 5 weeks starting from ${weekRanges[0].from}`)
 
         // Fetch tuần đầu — nếu 0 slots thì thử refresh token
@@ -633,7 +635,7 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
         if (!cancelled) {
           setLmsSlots(allSlots)
           setLmsLoadedOnce(true)
-          
+
           // Hiển thị toast thông báo kết quả
           const classCount = new Set(allSlots.filter(s => s.status === 'RUNNING').map(s => s.className)).size
           if (classCount > 0) {
@@ -669,14 +671,14 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
   function handleSelectLmsClass(className: string) {
     setSelectedLmsClassName(className)
     setLmsClassDropdownOpen(false)
-    
+
     // Auto-fill mã lớp + số học viên
     const cls = lmsRunningClasses.find((c) => c.className === className)
-    
+
     // Tìm slot tương lai đầu tiên của lớp này để lấy giờ
     const futureSlots = lmsSlots.filter(s => s.className?.trim() === className.trim())
     const firstSlot = futureSlots[0]
-    
+
     if (firstSlot) {
       const startHm = slotHhMm(firstSlot.startTime)
       const endHm = slotHhMm(firstSlot.endTime)
@@ -688,7 +690,7 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
       setClassTimeEnd(null)
       setClassTimeFromLms(false)
     }
-    
+
     // Auto-fill cơ sở dựa trên centreName
     let matchedCampus = ''
     if (cls?.centreName) {
@@ -699,13 +701,13 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
         // So sánh chính xác hoặc contains
         return optShort === centerShortName || opt.label.includes(centerShortName)
       })
-      
+
       if (campusOption) {
         matchedCampus = campusOption.value
         console.log('[XinNghi] Auto-fill campus:', matchedCampus, 'from centreName:', centerShortName)
       }
     }
-    
+
     setFormData((prev) => ({
       ...prev,
       class_code: className,
@@ -1044,11 +1046,18 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
       ) {
         setShowCampusPicker(false)
       }
+      if (
+        dateDropdownRef.current &&
+        !dateDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowDateDropdown(false)
+      }
     }
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setShowCampusPicker(false)
+        setShowDateDropdown(false)
       }
     }
 
@@ -1277,16 +1286,16 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
 
 Em là ${formData.teacher_name || '[Họ tên giáo viên đầy đủ]'} hiện đang là giáo viên tại cơ sở ${formData.campus || '[Tên Cơ Sở]'}, hôm nay em viết email này xin được nghỉ vào ngày ${leaveDateDisplay}.
 
-Vì lý do ${formData.reason || '[nêu lý do]'}. 
+Vì lý do ${formData.reason || '[nêu lý do]'}.
 
 Thông tin lớp học cụ thể như sau:
 
-Mã lớp: ${formData.class_code || '[Mã lớp học]'}. 
-Số học viên: ${formData.student_count || '[Số lượng học viên của lớp]'}. 
-Thời gian học: ${formData.class_time || '[Giờ Thứ, Ngày]'}. 
-Buổi học: ${formData.leave_session || '[Buổi học xin nghỉ]'}. 
-Giáo viên thay thế: ${formData.has_substitute ? formData.substitute_teacher || '[Nhập tên giáo viên thay thế]' : ''}. 
-Tình hình lớp học: ${formData.class_status || '[Nêu tình hình của lớp, có học viên nào cần lưu ý hay đặc biệt không]'}. 
+Mã lớp: ${formData.class_code || '[Mã lớp học]'}.
+Số học viên: ${formData.student_count || '[Số lượng học viên của lớp]'}.
+Thời gian học: ${formData.class_time || '[Giờ Thứ, Ngày]'}.
+Buổi học: ${formData.leave_session || '[Buổi học xin nghỉ]'}.
+Giáo viên thay thế: ${formData.has_substitute ? formData.substitute_teacher || '[Nhập tên giáo viên thay thế]' : ''}.
+Tình hình lớp học: ${formData.class_status || '[Nêu tình hình của lớp, có học viên nào cần lưu ý hay đặc biệt không]'}.
 
 ${
   hasSubstitute
@@ -1372,16 +1381,16 @@ ${formData.teacher_name || '[Họ Và Tên]'}`
 
 Em là ${editForm.teacher_name || '[Họ tên giáo viên đầy đủ]'} hiện đang là giáo viên tại cơ sở ${editForm.campus || '[Tên Cơ Sở]'}, hôm nay em viết email này xin được nghỉ vào ngày ${editLeaveDateDisplay}.
 
-Vì lý do ${editForm.reason || '[nêu lý do]'}. 
+Vì lý do ${editForm.reason || '[nêu lý do]'}.
 
 Thông tin lớp học cụ thể như sau:
 
-Mã lớp: ${editForm.class_code || '[Mã lớp học]'}. 
-Số học viên: ${editForm.student_count || '[Số lượng học viên của lớp]'}. 
-Thời gian học: ${editForm.class_time || '[Giờ Thứ, Ngày]'}. 
-Buổi học: ${editForm.leave_session || '[Buổi học xin nghỉ]'}. 
-Giáo viên thay thế: ${editForm.has_substitute ? editForm.substitute_teacher || '[Nhập tên giáo viên thay thế]' : ''}. 
-Tình hình lớp học: ${editForm.class_status || '[Nêu tình hình của lớp, có học viên nào cần lưu ý hay đặc biệt không]'}. 
+Mã lớp: ${editForm.class_code || '[Mã lớp học]'}.
+Số học viên: ${editForm.student_count || '[Số lượng học viên của lớp]'}.
+Thời gian học: ${editForm.class_time || '[Giờ Thứ, Ngày]'}.
+Buổi học: ${editForm.leave_session || '[Buổi học xin nghỉ]'}.
+Giáo viên thay thế: ${editForm.has_substitute ? editForm.substitute_teacher || '[Nhập tên giáo viên thay thế]' : ''}.
+Tình hình lớp học: ${editForm.class_status || '[Nêu tình hình của lớp, có học viên nào cần lưu ý hay đặc biệt không]'}.
 
 ${
   editHasSubstitute
@@ -1838,9 +1847,9 @@ ${editForm.teacher_name || '[Họ Và Tên]'}`
                 size="lg"
                 variant="outline"
                 onClick={() => fetchLeaveRequests(true)}
-                className="h-10 border-[#f3b4bd] text-[#a1001f] shadow-sm hover:bg-[#a1001f]/5"
+                className="h-9 sm:h-10 border-[#f3b4bd] text-[#a1001f] shadow-sm hover:bg-[#a1001f]/5 px-3 sm:px-4 text-sm sm:text-base"
               >
-                <RefreshCcw className="mr-1.5 h-4 w-4" />
+                <RefreshCcw className="mr-1 sm:mr-1.5 h-4 w-4" />
                 Làm mới
               </Button>
               <Button
@@ -1851,10 +1860,11 @@ ${editForm.teacher_name || '[Họ Và Tên]'}`
                   setShowModal(true)
                 }}
                 disabled={lmsLoading}
-                className="relative whitespace-nowrap border-2 border-[#a1001f] bg-[#a1001f] text-white shadow-md hover:bg-[#8a001a] disabled:opacity-60"
+                className="relative whitespace-nowrap border-2 border-[#a1001f] bg-[#a1001f] text-white shadow-md hover:bg-[#8a001a] h-9 sm:h-10 px-3 sm:px-6 text-sm sm:text-base disabled:opacity-60"
               >
-                <Plus className="mr-2 h-5 w-5" />
-                Tạo yêu cầu xin nghỉ
+                <Plus className="mr-1 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="hidden sm:inline">Tạo yêu cầu xin nghỉ</span>
+                <span className="inline sm:hidden">Tạo yêu cầu</span>
                 {lmsLoading && (
                   <span className="absolute -right-1 -top-1 flex h-5 w-5">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
@@ -1941,8 +1951,8 @@ ${editForm.teacher_name || '[Họ Và Tên]'}`
         </div>
 
         {/* Bộ lọc nâng cao */}
-        <div className="mb-4 flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
-          <div className="relative w-full md:w-auto">
+        <div className="mb-4 grid grid-cols-2 gap-3 md:flex md:flex-row md:flex-wrap md:items-end">
+          <div className="relative col-span-2 w-full md:w-auto">
             <label className="block text-xs font-semibold text-gray-600 mb-1">
               Cơ sở
             </label>
@@ -2031,7 +2041,7 @@ ${editForm.teacher_name || '[Họ Và Tên]'}`
               </div>
             )}
           </div>
-          <div className="w-fit md:w-auto">
+          <div className="w-full md:w-auto">
             <label className="block text-xs font-semibold text-gray-600 mb-1">
               Từ ngày
             </label>
@@ -2043,7 +2053,7 @@ ${editForm.teacher_name || '[Họ Và Tên]'}`
               max={toDate || undefined}
             />
           </div>
-          <div className="w-fit md:w-auto">
+          <div className="w-full md:w-auto">
             <label className="block text-xs font-semibold text-gray-600 mb-1">
               Đến ngày
             </label>
@@ -2068,6 +2078,7 @@ ${editForm.teacher_name || '[Họ Và Tên]'}`
                 setToDate('')
                 setStatFilter(null)
               }}
+              className="col-span-2 w-full justify-center md:w-auto"
             >
               Xoá lọc
             </Button>
@@ -2219,53 +2230,86 @@ ${editForm.teacher_name || '[Họ Và Tên]'}`
                 </label>
                 {selectedLmsClassName && selectedClassFutureSlots.length > 0 ? (
                   /* Dropdown ngày từ LMS khi đã chọn lớp */
-                  <div className="space-y-1.5">
-                    <select
-                      value={formData.leave_date}
-                      onChange={(e) => {
-                        const dateVal = e.target.value
-                        const slot = selectedClassFutureSlots.find((s) => s.date === dateVal)
-                        if (slot) {
-                          setClassTimeStart(slotHhMm(slot.startTime))
-                          setClassTimeEnd(slotHhMm(slot.endTime))
-                          setClassTimeFromLms(true)
-                          
-                          // Auto-fill buổi học từ sessionNumber
-                          if (slot.sessionNumber && slot.sessionNumber > 0) {
-                            setLeaveSessionFromLms(true)
-                            setFormData((prev) => ({
-                              ...prev,
-                              leave_date: dateVal,
-                              leave_session: `Buổi ${slot.sessionNumber}`,
-                            }))
-                          } else {
-                            setLeaveSessionFromLms(false)
-                            setFormData((prev) => ({
-                              ...prev,
-                              leave_date: dateVal,
-                            }))
-                          }
-                        } else {
-                          handleChange('leave_date', dateVal)
-                        }
-                      }}
-                      className={SELECT_BASE_CLASS}
+                  <div ref={dateDropdownRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowDateDropdown(!showDateDropdown)}
+                      className={`${SELECT_BASE_CLASS} flex w-full items-center justify-between bg-white text-left`}
                     >
-                      <option value="">-- Chọn ngày --</option>
-                      {selectedClassFutureSlots.map((slot) => {
-                        const eligible = slotIsEligible(slot)
-                        const dateDisplay = new Date(`${slot.date}T00:00:00`).toLocaleDateString('vi-VN', {
-                          weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric',
-                        })
-                        const startHm = slotHhMm(slot.startTime)
-                        const endHm = slotHhMm(slot.endTime)
-                        return (
-                          <option key={slot.date} value={slot.date} disabled={!eligible}>
-                            {eligible ? '✅' : '⛔'} {dateDisplay} — {timeToVnSegment(startHm)}–{timeToVnSegment(endHm)}{!eligible ? ' (quá hạn 72h)' : ''}
-                          </option>
-                        )
-                      })}
-                    </select>
+                      <span className="truncate">
+                        {formData.leave_date ? (
+                          (() => {
+                            const slot = selectedClassFutureSlots.find(s => s.date === formData.leave_date)
+                            if (slot) {
+                              const dateDisplay = new Date(`${slot.date}T00:00:00`).toLocaleDateString('vi-VN', {
+                                weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric',
+                              })
+                              const startHm = slotHhMm(slot.startTime)
+                              const endHm = slotHhMm(slot.endTime)
+                              return `${dateDisplay} — ${timeToVnSegment(startHm)}–${timeToVnSegment(endHm)}`
+                            }
+                            return formData.leave_date
+                          })()
+                        ) : "-- Chọn ngày --"}
+                      </span>
+                      <ChevronDown className="h-4 w-4 ml-2 shrink-0 text-gray-500" />
+                    </button>
+                    {showDateDropdown && (
+                      <div className="absolute left-0 right-0 z-20 mt-1 flex max-h-60 w-full flex-col overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-lg py-1 custom-scrollbar">
+                        {selectedClassFutureSlots.map((slot) => {
+                          const eligible = slotIsEligible(slot)
+                          const dateDisplay = new Date(`${slot.date}T00:00:00`).toLocaleDateString('vi-VN', {
+                            weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric',
+                          })
+                          const startHm = slotHhMm(slot.startTime)
+                          const endHm = slotHhMm(slot.endTime)
+                          return (
+                            <button
+                              key={slot.date}
+                              type="button"
+                              disabled={!eligible}
+                              onClick={() => {
+                                const dateVal = slot.date
+                                setClassTimeStart(slotHhMm(slot.startTime))
+                                setClassTimeEnd(slotHhMm(slot.endTime))
+                                setClassTimeFromLms(true)
+
+                                if (slot.sessionNumber && slot.sessionNumber > 0) {
+                                  setLeaveSessionFromLms(true)
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    leave_date: dateVal,
+                                    leave_session: `Buổi ${slot.sessionNumber}`,
+                                  }))
+                                } else {
+                                  setLeaveSessionFromLms(false)
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    leave_date: dateVal,
+                                  }))
+                                }
+                                setShowDateDropdown(false)
+                              }}
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:bg-gray-50/50 disabled:cursor-not-allowed ${
+                                formData.leave_date === slot.date ? 'bg-[#a1001f]/5 font-medium text-[#a1001f]' : 'text-gray-700'
+                              }`}
+                            >
+                              {eligible ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                              ) : (
+                                <CircleX className="h-4 w-4 text-red-500 shrink-0" />
+                              )}
+                              <span className="flex-1 truncate">
+                                {dateDisplay} — {timeToVnSegment(startHm)}–{timeToVnSegment(endHm)}
+                              </span>
+                              {!eligible && (
+                                <span className="text-xs text-red-500 shrink-0 ml-1">(quá hạn 72h)</span>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 ) : selectedLmsClassName && selectedClassFutureSlots.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-gray-300 p-3 text-sm text-gray-500">

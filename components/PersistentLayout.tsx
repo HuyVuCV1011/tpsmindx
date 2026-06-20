@@ -2,16 +2,22 @@
 
 import UserFirstLoginOnboarding from '@/components/onboarding/UserFirstLoginOnboarding'
 import { Sidebar } from '@/components/sidebar'
+import { DockNav } from '@/components/dock-nav'
 import NotificationBell from '@/components/NotificationBell'
 import { useAuth } from '@/lib/auth-context'
 import { SidebarProvider, useSidebar } from '@/lib/sidebar-context'
 import { usePathname } from 'next/navigation'
-import { Suspense } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 
 function Layout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { isOpen } = useSidebar();
+  const { isOpen, navMode } = useSidebar();
   const { user } = useAuth();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Don't show sidebar on login/root/checkdatasource/maintenance pages
   const noSidebarPaths =
@@ -37,18 +43,32 @@ function Layout({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const isDockMode = navMode === 'dock'
+
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {shouldShowSidebar && (
+      {mounted && shouldShowSidebar && (
         <>
+          {/* Always render Sidebar (it handles its own open/close state) */}
           <Suspense fallback={null}>
             <Sidebar />
           </Suspense>
-          <Suspense fallback={null}>
-            <div className="hidden lg:block">
-              <NotificationBell />
-            </div>
-          </Suspense>
+
+          {/* Notification Bell — only in sidebar mode on desktop (dock mode has it in dock) */}
+          {!isDockMode && (
+            <Suspense fallback={null}>
+              <div className="hidden lg:block">
+                <NotificationBell />
+              </div>
+            </Suspense>
+          )}
+
+          {/* Dock navigation — shown only in dock mode */}
+          {isDockMode && (
+            <Suspense fallback={null}>
+              <DockNav />
+            </Suspense>
+          )}
         </>
       )}
       <main
@@ -56,9 +76,9 @@ function Layout({ children }: { children: React.ReactNode }) {
         className={`
           transition-all duration-500 ease-in-out min-h-screen lg:will-change-transform
           ${
-            shouldShowSidebar
+            mounted && shouldShowSidebar && !isDockMode
               ? isOpen
-                ? 'lg:ml-56' // Desktop with sidebar
+                ? 'lg:ml-56' // Desktop with sidebar open
                 : 'lg:ml-0' // Desktop without sidebar
               : ''
           }
@@ -69,7 +89,10 @@ function Layout({ children }: { children: React.ReactNode }) {
           <div className="min-h-screen lg:h-full lg:overflow-y-auto custom-scrollbar">
             <div
               className={`w-full px-0 py-1.25 sm:px-[1.5%] sm:py-2 lg:px-[2%] lg:py-3 xl:px-[2.5%] xl:py-3 ${
-                shouldShowSidebar && !isOpen ? 'pt-14 sm:pt-16 lg:pt-3' : ''
+                mounted && shouldShowSidebar && !isDockMode && !isOpen ? 'pt-14 sm:pt-16 lg:pt-3' : ''
+              } ${
+                // Add bottom padding in dock mode so content isn't hidden behind the dock
+                mounted && shouldShowSidebar && isDockMode ? 'pb-24' : ''
               }`}
             >
               {children}

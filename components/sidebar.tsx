@@ -3,6 +3,7 @@
 import { useAuth } from '@/lib/auth-context'
 import { filterManagementPermissions } from '@/lib/admin-permission-routes'
 import { useSidebar } from '@/lib/sidebar-context'
+import { getFilteredAdminMenuItems as getFilteredAdminMenuItemsUtil } from '@/lib/menu-permissions'
 import { isTempHiddenUserRoute } from '@/lib/temp-hidden-user-routes'
 import { cn } from '@/lib/utils'
 import {
@@ -19,6 +20,8 @@ import {
   Mail,
   Megaphone,
   Menu,
+  PanelBottom,
+  Search,
   Settings,
   Sparkles,
   Users,
@@ -33,16 +36,39 @@ import { Icon } from '@/components/ui/primitives/icon'
 import { authHeaders } from '@/lib/auth-headers'
 import useSWR from 'swr'
 import NotificationBell from '@/components/NotificationBell'
+import GlobalSearch from '@/components/GlobalSearch'
 
 const NOTIFICATION_COUNT_REFRESH_MS = 180_000
 const NOTIFICATION_DEDUPING_MS = 60_000
 
 export function Sidebar() {
-  const { isOpen, setIsOpen, requestExpandLabels } = useSidebar()
+  const { isOpen, setIsOpen, requestExpandLabels, navMode, setNavMode } = useSidebar()
   const [expandedMenus, setExpandedMenus] = useState<string[]>([])
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [isMac, setIsMac] = useState(false)
   const { user, token, logout } = useAuth()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const ua = navigator.userAgent || navigator.platform || ''
+      setIsMac(/Mac|iPod|iPhone|iPad/.test(ua))
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isK = e.key === 'k' || e.key === 'K'
+      const isShortcut = ((isMac ? e.metaKey : e.ctrlKey) || e.ctrlKey || e.metaKey) && isK
+      if (isShortcut) {
+        e.preventDefault()
+        setIsSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isMac])
 
   const fetcher = useMemo(
     () => (url: string) =>
@@ -147,7 +173,7 @@ export function Sidebar() {
 
   const adminMenuItems = [
     { href: '/admin/dashboard', label: 'Bảng Điều Khiển', icon: Home },
-    { href: '/user/thong-bao', label: 'Thông báo', icon: Bell },
+    { href: '/admin/thong-bao', label: 'Thông báo', icon: Bell },
     {
       href: '/admin/truyenthong',
       label: 'Quản Lý Truyền Thông',
@@ -371,102 +397,7 @@ export function Sidebar() {
 
   // Filter admin menu items based on user permissions
   const getFilteredAdminMenuItems = () => {
-    if (!user) return []
-
-    const normalizedRole = normalizeRoleToken(user.role)
-    const isSuperAdmin =
-      normalizedRole === 'super_admin' ||
-      (user.userRoles || []).some(
-        (code) => normalizeRoleToken(code) === 'super_admin',
-      )
-
-    if (isSuperAdmin) return adminMenuItems
-
-    // manager và admin luôn có quyền truy cập deal-luong
-    const DEAL_LUONG_ROUTES = ['/admin/deal-luong', '/admin/tao-deal-luong']
-    const basePermissions = filterManagementPermissions(user.permissions || [])
-    const permissions = ['manager', 'admin'].includes(normalizedRole)
-      ? Array.from(new Set([...basePermissions, ...DEAL_LUONG_ROUTES]))
-      : basePermissions
-
-    const hasAnyK12Access = permissions.some((p) => {
-      const normalizedPath = p.split('?')[0]
-      return (
-        normalizedPath === '/admin/page2' ||
-        normalizedPath.startsWith('/admin/page2/')
-      )
-    })
-
-    const effectivePermissions = hasAnyK12Access
-      ? Array.from(
-        new Set([...permissions, '/admin/page2', '/admin/page2/manage']),
-      )
-      : permissions
-
-    const roleCodes = (user.userRoles || []).map((code) =>
-      normalizeRoleToken(code),
-    )
-    const hasTrainingInputRole = roleCodes.some(
-      (code) => code === 'hr' || code === 'te' || code === 'tf',
-    )
-    if (effectivePermissions.length === 0 && !hasTrainingInputRole) return []
-
-    const hasPermissionForHref = (href: string) => {
-      const targetPath = href.split('?')[0]
-      return permissions.some(
-        (p) =>
-          targetPath === p ||
-          targetPath.startsWith(`${p}/`) ||
-          p.startsWith(`${targetPath}/`),
-      )
-    }
-
-    const filterMenuItemsByPermissions = (items: any[]): any[] => {
-      return items
-        .map((item) => {
-          const isK12PolicyGroup =
-            item?.label === 'Quy Trình, Quy Định K12 Teaching'
-          if (
-            isK12PolicyGroup &&
-            item?.submenu &&
-            Array.isArray(item.submenu)
-          ) {
-            const canOpenK12Group =
-              hasPermissionForHref('/admin/page2') ||
-              hasPermissionForHref('/admin/page2/manage') ||
-              pathname.startsWith('/admin/page2')
-
-            if (canOpenK12Group) {
-              return item
-            }
-          }
-
-          const isTrainingInputMenu = item?.href === '/admin/hr-candidates'
-          if (isTrainingInputMenu && hasTrainingInputRole) {
-            return item
-          }
-
-          if (item?.href === '/admin/system-metrics') {
-            return null
-          }
-
-          if (item?.submenu && Array.isArray(item.submenu)) {
-            const filteredChildren = filterMenuItemsByPermissions(item.submenu)
-            if (filteredChildren.length > 0) {
-              return { ...item, submenu: filteredChildren }
-            }
-          }
-
-          if (item?.href && hasPermissionForHref(item.href)) {
-            return item
-          }
-
-          return null
-        })
-        .filter(Boolean)
-    }
-
-    return filterMenuItemsByPermissions(adminMenuItems)
+    return getFilteredAdminMenuItemsUtil(adminMenuItems, user, pathname)
   }
 
   const menuItems = isUserArea ? userMenuItems : getFilteredAdminMenuItems()
@@ -596,7 +527,7 @@ export function Sidebar() {
   return (
     <>
       {/* Mobile header: visible on pages, hidden while sidebar is open */}
-      {!isOpen && (
+      {!isOpen && navMode === 'sidebar' && (
         <div className="fixed left-0 right-0 top-0 z-sidebar-toggle lg:hidden">
           <div className="flex h-14 items-center justify-between border border-gray-200 bg-white px-3 py-2 shadow-sm">
             <Link
@@ -643,15 +574,31 @@ export function Sidebar() {
         />
       )}
 
-      {/* Desktop toggle button when sidebar is collapsed */}
-      {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="fixed top-3 left-3 z-sidebar-toggle hidden rounded-lg border border-gray-200 bg-white p-2 shadow-md transition-all duration-300 group animate-in fade-in-0 slide-in-from-left-2 hover:scale-105 hover:border-[#a1001f] hover:bg-[#a1001f] hover:text-white hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a1001f] focus-visible:ring-offset-2 lg:block"
-          aria-label="Mở sidebar"
-        >
-          <Menu className="h-4 w-4 transition-transform group-hover:rotate-180 duration-300" />
-        </button>
+      {/* Desktop control buttons when sidebar is collapsed */}
+      {!isOpen && navMode === 'sidebar' && (
+        <div className="fixed top-3 left-3 z-sidebar-toggle hidden items-center gap-2 lg:flex animate-in fade-in-0 slide-in-from-left-2">
+          <button
+            onClick={() => setIsOpen(true)}
+            className="rounded-lg border border-gray-200 bg-white p-2.5 shadow-md transition-all duration-300 group hover:scale-105 hover:border-[#a1001f] hover:bg-[#a1001f] hover:text-white hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a1001f] focus-visible:ring-offset-2"
+            aria-label="Mở sidebar"
+          >
+            <Menu className="h-4 w-4 transition-transform group-hover:rotate-180 duration-300" />
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => setIsSearchOpen(true)}
+            aria-label={`Tìm kiếm (${isMac ? '⌘K' : 'Ctrl+K'})`}
+            className="group/icon relative flex items-center justify-center rounded-[10px] transition-all duration-150 ease-out bg-black/[0.06] text-[#1d1d1f] hover:bg-[#a1001f] hover:text-white active:scale-[0.93] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a1001f] focus-visible:ring-offset-2 shadow-md border border-gray-200/50"
+            style={{ width: '37px', height: '37px' }}
+          >
+            <Search className="h-4 w-4" />
+            <span className="pointer-events-none absolute -bottom-10 left-1/2 -translate-x-1/2 z-[60] hidden sm:block whitespace-nowrap rounded-lg bg-[#1d1d1f]/90 px-2.5 py-1.5 text-white text-[12px] font-medium shadow-lg opacity-0 transition-opacity duration-100 group-hover/icon:opacity-100">
+              Tìm kiếm&nbsp;<span className="opacity-50 text-[11px]">{isMac ? '⌘K' : 'Ctrl+K'}</span>
+              <span className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-[#1d1d1f]/90" />
+            </span>
+          </button>
+        </div>
       )}
 
       {/* Sidebar - Modern glass-morphism design */}
@@ -698,6 +645,22 @@ export function Sidebar() {
 
           {/* Navigation - Modern cards with smooth hover effects */}
           <nav className="flex-1 min-h-0 overflow-y-auto p-3 space-y-1 pb-4 custom-scrollbar">
+            {/* Prominent Search box on Sidebar */}
+            <div className="pb-2">
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(true)}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 hover:border-gray-300 transition-all duration-200 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a1001f] focus-visible:ring-offset-2"
+                aria-label="Tìm kiếm"
+              >
+                <Search className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                <span className="flex-1 text-xs text-gray-500 font-medium">Tìm kiếm...</span>
+                <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-white border border-gray-200 text-[10px] text-gray-400 font-mono leading-none">
+                  {isMac ? '⌘K' : 'Ctrl+K'}
+                </kbd>
+              </button>
+            </div>
+
             {menuItems.map((item) => {
               const Icon = item.icon
               const hasSubmenu = 'submenu' in item
@@ -1018,6 +981,20 @@ export function Sidebar() {
                 </div>
               </Link>
 
+              {/* Switch to Dock mode */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="mb-2 w-full justify-start text-xs border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                onClick={() => {
+                  setNavMode('dock')
+                  closeSidebarOnMobile()
+                }}
+              >
+                <PanelBottom className="h-3.5 w-3.5 mr-1" />
+                Chuyển sang Dock
+              </Button>
+
               <Button
                 variant="outline"
                 size="sm"
@@ -1042,6 +1019,11 @@ export function Sidebar() {
           onClick={() => setIsOpen(false)}
         />
       )}
+
+      <GlobalSearch
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+      />
     </>
   )
 }
