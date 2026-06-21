@@ -276,91 +276,100 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
 
   const configs = [
     { // Hạng II
-      bg: '#ffffff',
-      border: 'border-[6px]',
-      borderColor: '#ffffff',
+      bg: 'radial-gradient(circle at 18% 9%, rgba(255,255,255,0.74) 0%, rgba(255,255,255,0.28) 24%, transparent 44%), radial-gradient(circle at 86% 78%, rgba(185,232,244,0.38) 0%, transparent 46%), linear-gradient(145deg, rgba(238,251,255,0.42), rgba(255,255,255,0.16) 42%, rgba(205,236,248,0.28) 100%)',
+      border: 'border',
+      borderColor: 'rgba(226,250,255,0.9)',
       avatarBorderColor: '#ffffff',
       ringCls: '',
-      badgeBg: '#ffffff',
-      badgeBorder: '1px solid #e5e7eb',
-      badgeTextColor: '#ef4444',
-      scoreBg: '#ffffff',
-      scoreBorder: '1px solid #e5e7eb',
-      scoreTextColor: '#ef4444',
-      textColor: '#ef4444',
+      badgeBg: 'linear-gradient(135deg, rgba(255,255,255,0.72), rgba(248,250,252,0.42))',
+      badgeBorder: '1px solid rgba(255, 255, 255, 0.62)',
+      badgeTextColor: '#b91c1c',
+      scoreBg: 'radial-gradient(circle at 18% 12%, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.42) 24%, transparent 46%), radial-gradient(circle at 88% 72%, rgba(185,232,244,0.48) 0%, transparent 44%), linear-gradient(135deg, rgba(237,250,255,0.46), rgba(255,255,255,0.22) 48%, rgba(198,234,246,0.36))',
+      scoreBorder: '1px solid rgba(221, 247, 255, 0.92)',
+      scoreTextColor: '#dc2626',
+      textColor: '#dc2626',
       subTextColor: '#4b5563',
       sloganColor: '#ef4444',
-      shadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
-      glow: 'transparent',
-      tiltGlow: 'transparent',
-      avatarGlow: 'transparent',
+      shadow: '0 36px 72px -30px rgba(14, 45, 60, 0.46), 0 18px 34px -24px rgba(69, 10, 10, 0.42), inset 0 1px 0 rgba(255,255,255,0.88), inset 0 -1px 2px rgba(74,144,172,0.22)',
+      glow: 'radial-gradient(circle at 12% 8%, rgba(255,255,255,0.34), transparent 20%), radial-gradient(circle at 90% 16%, rgba(185,232,244,0.24), transparent 21%), linear-gradient(140deg, rgba(255,255,255,0.1), transparent 42%, rgba(185,232,244,0.1) 80%, transparent)',
+      tiltGlow: 'rgba(226,250,255,0.3)',
+      avatarGlow: 'linear-gradient(180deg, transparent 0%, transparent 56%, rgba(15,23,42,0.16) 100%)',
       avatarGlowSoft: 'transparent',
-      starColor: '#ef4444',
-      starFill: '#ef4444',
-      captionBg: '#ffffff',
-      captionBorder: 'transparent',
-      accentLine: 'transparent',
-      veilBg: 'transparent',
-      sheenBg: 'transparent',
-      shimmerBg: 'transparent',
+      starColor: '#cbd5e1',
+      starFill: '#f8fafc',
+      captionBg: 'linear-gradient(180deg, rgba(245,252,255,0.68), rgba(255,255,255,0.42))',
+      captionBorder: 'rgba(226,250,255,0.66)',
+      accentLine: 'linear-gradient(90deg, transparent, rgba(221,247,255,0.95), transparent)',
+      veilBg: 'linear-gradient(180deg, transparent 0%, transparent 62%, rgba(15,23,42,0.18) 100%)',
+      sheenBg: 'linear-gradient(115deg, transparent 16%, rgba(255,255,255,0.18) 32%, rgba(255,255,255,0.04) 44%, transparent 58%)',
+      shimmerBg: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.72), transparent)',
+      rim: 'linear-gradient(135deg, rgba(255,255,255,0.98), rgba(226,250,255,0.34) 28%, rgba(115,205,232,0.38) 62%, rgba(255,255,255,0.84))',
+      liquidTint: 'rgba(185, 232, 244, 0.24)',
+      halo: 'radial-gradient(circle at 50% 25%, rgba(226, 250, 255, 0.34), transparent 58%)',
     },
     { // Hạng I
-      bg: '#ffffff',
-      border: 'border-[6px]',
-      borderColor: '#ffffff',
+      bg: 'radial-gradient(circle at 18% 9%, rgba(255,255,255,0.78) 0%, rgba(255,255,255,0.32) 24%, transparent 44%), radial-gradient(circle at 88% 76%, rgba(255,214,94,0.26) 0%, transparent 42%), radial-gradient(circle at 86% 80%, rgba(185,232,244,0.42) 0%, transparent 48%), linear-gradient(145deg, rgba(238,251,255,0.48), rgba(255,255,255,0.18) 42%, rgba(204,239,249,0.34) 100%)',
+      border: 'border',
+      borderColor: 'rgba(226,250,255,0.96)',
       avatarBorderColor: '#ffffff',
       ringCls: '',
-      badgeBg: '#ffffff',
-      badgeBorder: '1px solid #e5e7eb',
-      badgeTextColor: '#ef4444',
-      scoreBg: '#ffffff',
-      scoreBorder: '1px solid #e5e7eb',
-      scoreTextColor: '#ef4444',
-      textColor: '#ef4444',
-      subTextColor: '#4b5563',
+      badgeBg: 'linear-gradient(135deg, rgba(255,255,255,0.76), rgba(255,247,218,0.5))',
+      badgeBorder: '1px solid rgba(255, 247, 208, 0.78)',
+      badgeTextColor: '#b91c1c',
+      scoreBg: 'radial-gradient(circle at 18% 12%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.46) 24%, transparent 46%), radial-gradient(circle at 88% 72%, rgba(187,235,246,0.52) 0%, transparent 44%), linear-gradient(135deg, rgba(238,251,255,0.5), rgba(255,255,255,0.24) 48%, rgba(204,239,249,0.4))',
+      scoreBorder: '1px solid rgba(226, 250, 255, 0.96)',
+      scoreTextColor: '#dc2626',
+      textColor: '#dc2626',
+      subTextColor: '#374151',
       sloganColor: '#ef4444',
-      shadow: '0 25px 30px -5px rgba(0, 0, 0, 0.4), 0 15px 15px -5px rgba(0, 0, 0, 0.3)',
-      glow: 'transparent',
-      tiltGlow: 'transparent',
-      avatarGlow: 'transparent',
+      shadow: '0 44px 92px -34px rgba(14, 45, 60, 0.5), 0 24px 50px -30px rgba(245, 158, 11, 0.42), inset 0 1px 0 rgba(255,255,255,0.92), inset 0 -1px 2px rgba(74,144,172,0.24)',
+      glow: 'radial-gradient(circle at 14% 8%, rgba(255,255,255,0.36), transparent 21%), radial-gradient(circle at 86% 14%, rgba(255,239,184,0.22), transparent 20%), linear-gradient(140deg, rgba(255,255,255,0.12), transparent 40%, rgba(185,232,244,0.12) 80%, transparent)',
+      tiltGlow: 'rgba(226,250,255,0.34)',
+      avatarGlow: 'linear-gradient(180deg, transparent 0%, transparent 58%, rgba(69,10,10,0.18) 100%)',
       avatarGlowSoft: 'transparent',
-      starColor: '#ef4444',
-      starFill: '#ef4444',
-      captionBg: '#ffffff',
-      captionBorder: 'transparent',
-      accentLine: 'transparent',
-      veilBg: 'transparent',
-      sheenBg: 'transparent',
-      shimmerBg: 'transparent',
+      starColor: '#fbbf24',
+      starFill: '#fbbf24',
+      captionBg: 'linear-gradient(180deg, rgba(245,252,255,0.72), rgba(255,255,255,0.46))',
+      captionBorder: 'rgba(226,250,255,0.72)',
+      accentLine: 'linear-gradient(90deg, transparent, rgba(226,250,255,0.98), transparent)',
+      veilBg: 'linear-gradient(180deg, transparent 0%, transparent 60%, rgba(69,10,10,0.18) 100%)',
+      sheenBg: 'linear-gradient(115deg, transparent 14%, rgba(255,255,255,0.2) 32%, rgba(255,236,170,0.06) 46%, transparent 60%)',
+      shimmerBg: 'linear-gradient(90deg, transparent, rgba(255,236,172,0.78), transparent)',
+      rim: 'linear-gradient(135deg, rgba(255,255,255,1), rgba(226,250,255,0.38) 28%, rgba(115,205,232,0.42) 58%, rgba(255,244,197,0.42) 76%, rgba(255,255,255,0.88))',
+      liquidTint: 'rgba(185, 232, 244, 0.28)',
+      halo: 'radial-gradient(circle at 50% 25%, rgba(226, 250, 255, 0.42), transparent 58%)',
     },
     { // Hạng III
-      bg: '#ffffff',
-      border: 'border-[6px]',
-      borderColor: '#ffffff',
+      bg: 'radial-gradient(circle at 18% 9%, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.28) 24%, transparent 44%), radial-gradient(circle at 86% 78%, rgba(185,232,244,0.34) 0%, transparent 46%), linear-gradient(145deg, rgba(238,251,255,0.4), rgba(255,255,255,0.16) 42%, rgba(205,236,248,0.28) 100%)',
+      border: 'border',
+      borderColor: 'rgba(226,250,255,0.88)',
       avatarBorderColor: '#ffffff',
       ringCls: '',
-      badgeBg: '#ffffff',
-      badgeBorder: '1px solid #e5e7eb',
-      badgeTextColor: '#ef4444',
-      scoreBg: '#ffffff',
-      scoreBorder: '1px solid #e5e7eb',
-      scoreTextColor: '#ef4444',
-      textColor: '#ef4444',
+      badgeBg: 'linear-gradient(135deg, rgba(255,255,255,0.72), rgba(255,243,232,0.46))',
+      badgeBorder: '1px solid rgba(255, 241, 230, 0.68)',
+      badgeTextColor: '#b91c1c',
+      scoreBg: 'radial-gradient(circle at 18% 12%, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.42) 24%, transparent 46%), radial-gradient(circle at 88% 72%, rgba(185,232,244,0.46) 0%, transparent 44%), linear-gradient(135deg, rgba(237,250,255,0.46), rgba(255,255,255,0.22) 48%, rgba(198,234,246,0.36))',
+      scoreBorder: '1px solid rgba(221, 247, 255, 0.92)',
+      scoreTextColor: '#dc2626',
+      textColor: '#dc2626',
       subTextColor: '#4b5563',
       sloganColor: '#ef4444',
-      shadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
-      glow: 'transparent',
-      tiltGlow: 'transparent',
-      avatarGlow: 'transparent',
+      shadow: '0 36px 72px -30px rgba(14, 45, 60, 0.44), 0 18px 34px -24px rgba(124, 45, 18, 0.38), inset 0 1px 0 rgba(255,255,255,0.86), inset 0 -1px 2px rgba(74,144,172,0.2)',
+      glow: 'radial-gradient(circle at 14% 8%, rgba(255,255,255,0.3), transparent 20%), radial-gradient(circle at 88% 14%, rgba(185,232,244,0.2), transparent 18%), linear-gradient(140deg, rgba(255,255,255,0.1), transparent 42%, rgba(185,232,244,0.1) 80%, transparent)',
+      tiltGlow: 'rgba(226,250,255,0.28)',
+      avatarGlow: 'linear-gradient(180deg, transparent 0%, transparent 60%, rgba(69,10,10,0.16) 100%)',
       avatarGlowSoft: 'transparent',
-      starColor: '#ef4444',
-      starFill: '#ef4444',
-      captionBg: '#ffffff',
-      captionBorder: 'transparent',
-      accentLine: 'transparent',
-      veilBg: 'transparent',
-      sheenBg: 'transparent',
-      shimmerBg: 'transparent',
+      starColor: '#fb923c',
+      starFill: '#fb923c',
+      captionBg: 'linear-gradient(180deg, rgba(245,252,255,0.68), rgba(255,255,255,0.42))',
+      captionBorder: 'rgba(226,250,255,0.64)',
+      accentLine: 'linear-gradient(90deg, transparent, rgba(221,247,255,0.92), transparent)',
+      veilBg: 'linear-gradient(180deg, transparent 0%, transparent 62%, rgba(69,10,10,0.16) 100%)',
+      sheenBg: 'linear-gradient(115deg, transparent 16%, rgba(255,255,255,0.18) 32%, rgba(255,214,165,0.05) 46%, transparent 60%)',
+      shimmerBg: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent)',
+      rim: 'linear-gradient(135deg, rgba(255,255,255,0.96), rgba(226,250,255,0.32) 28%, rgba(115,205,232,0.34) 62%, rgba(255,255,255,0.82))',
+      liquidTint: 'rgba(185, 232, 244, 0.22)',
+      halo: 'radial-gradient(circle at 50% 25%, rgba(226, 250, 255, 0.3), transparent 58%)',
     },
   ]
   const cfg = configs[idx]
@@ -413,22 +422,27 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
       onMouseMove={onMouseMove}
       onMouseLeave={onMouseLeave}
     >
+      {isFirst && (
+        <div className="absolute -inset-x-6 -top-6 bottom-8 -z-10 rounded-full opacity-70 blur-2xl"
+          style={{ background: cfg.halo }} />
+      )}
+
       {/* Rank label above card */}
-      <div className="flex items-center justify-center gap-1 mb-1.5 sm:mb-2">
-        {idx === 1 && <Trophy className={cn("text-yellow-400 fill-yellow-400", isFirst ? "w-3.5 h-3.5 sm:w-4 sm:h-4" : "w-3 h-3")} />}
-        {idx === 0 && <Crown className={cn("text-slate-300 fill-slate-300", "w-3 h-3 sm:w-3.5 sm:h-3.5")} />}
-        {idx === 2 && <Star className={cn("text-orange-400 fill-orange-400", "w-3 h-3 sm:w-3.5 sm:h-3.5")} />}
+      <div className={cn("relative flex items-center justify-center gap-1.5 mb-1.5 sm:mb-2", isFirst ? "scale-105" : "")}>
+        {idx === 1 && <Trophy className={cn("text-yellow-300 fill-yellow-300 drop-shadow-[0_2px_8px_rgba(250,204,21,0.65)]", isFirst ? "w-4 h-4 sm:w-5 sm:h-5" : "w-3 h-3")} />}
+        {idx === 0 && <Crown className={cn("text-slate-100 fill-slate-100 drop-shadow-[0_2px_8px_rgba(226,232,240,0.45)]", "w-3.5 h-3.5 sm:w-4 sm:h-4")} />}
+        {idx === 2 && <Star className={cn("text-orange-300 fill-orange-300 drop-shadow-[0_2px_8px_rgba(251,146,60,0.5)]", "w-3.5 h-3.5 sm:w-4 sm:h-4")} />}
         <span className={cn(
-          "font-black tracking-widest uppercase",
-          isFirst ? "text-[11px] sm:text-[13px] text-yellow-300" : "text-[10px] sm:text-[11px] text-white/70"
-        )} style={{ textShadow: isFirst ? '0 0 10px rgba(251,191,36,0.6)' : undefined }}>
+          "font-black uppercase",
+          isFirst ? "text-[12px] sm:text-[15px] text-yellow-200 tracking-[0.18em]" : "text-[10px] sm:text-[12px] text-white/82 tracking-[0.16em]"
+        )} style={{ textShadow: isFirst ? '0 0 14px rgba(251,191,36,0.68), 0 2px 6px rgba(0,0,0,0.4)' : '0 2px 6px rgba(0,0,0,0.38)' }}>
           Hạng {teacher.rank === 1 ? 'I' : teacher.rank === 2 ? 'II' : 'III'}
         </span>
       </div>
 
       <div
         ref={cardEl}
-        className={cn('relative w-full flex flex-col rounded-[20px] sm:rounded-[24px] overflow-hidden flex-1', cfg.border)}
+        className={cn('relative w-full flex flex-col rounded-[24px] sm:rounded-[30px] overflow-hidden flex-1', cfg.border)}
         style={{
           background: cfg.bg,
           boxShadow: cfg.shadow,
@@ -437,21 +451,53 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
           isolation: 'isolate',
           WebkitMaskImage: '-webkit-radial-gradient(white, black)',
           height: '100%',
+          backdropFilter: 'blur(30px) saturate(2) contrast(1.06)',
+          WebkitBackdropFilter: 'blur(30px) saturate(2) contrast(1.06)',
         }}
       >
-        {/* Subtle overlay layers — kept minimal */}
-        <div ref={glowEl} className="absolute inset-0 pointer-events-none transition-none z-10" style={{ background: cfg.glow, borderRadius: '20px' }} />
-        <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden rounded-[20px]">
-          <div className="absolute -inset-full top-0 left-0 w-1/2 h-full skew-x-[-25deg] animate-[shimmer-sweep_6s_infinite_linear]" style={{ backgroundImage: cfg.shimmerBg, opacity: 0.35 }} />
+        <div className="absolute inset-0 pointer-events-none z-[1] rounded-[inherit] p-px" style={{ background: cfg.rim }}>
+          <div className="h-full w-full rounded-[inherit]" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.04))' }} />
         </div>
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent z-20 pointer-events-none" />
+        <div className="absolute left-[8%] right-[8%] top-[-8%] h-[20%] pointer-events-none z-[2] rounded-[50%] blur-[10px] opacity-40"
+          style={{ background: `radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.34), ${cfg.liquidTint} 42%, transparent 74%)`, animation: 'liquid-breathe 5.8s ease-in-out infinite' }} />
+        <div className="absolute left-1/2 top-[38%] h-[52%] w-[92%] -translate-x-1/2 pointer-events-none z-[2] rounded-[50%] blur-[18px] mix-blend-screen"
+          style={{ background: 'linear-gradient(90deg, rgba(239,68,68,0.22), rgba(251,146,60,0.34), rgba(255,255,255,0.14), rgba(125,211,252,0.18))', animation: 'apple-card-flow 8s ease-in-out infinite' }} />
+        <div className="absolute -left-[16%] top-[8%] h-[34%] w-[48%] pointer-events-none z-[2] rounded-[48%] blur-[8px] opacity-32 mix-blend-screen"
+          style={{ background: 'linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.36) 34%, rgba(185,232,244,0.08) 50%, transparent 70%)', animation: 'liquid-caustic 7.2s ease-in-out infinite' }} />
+
+        {/* Liquid glass overlay layers */}
+        <div ref={glowEl} className="absolute inset-0 pointer-events-none transition-none z-10" style={{ background: cfg.glow, borderRadius: 'inherit' }} />
+        <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden rounded-[inherit]">
+          <div className="absolute -inset-full top-0 left-0 w-1/2 h-full skew-x-[-25deg] animate-[shimmer-sweep_6s_infinite_linear]" style={{ backgroundImage: cfg.shimmerBg, opacity: 0.14 }} />
+        </div>
+        <div className="absolute inset-x-3 top-2 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent z-20 pointer-events-none" />
+        <div className="absolute inset-x-8 top-4 h-[10%] rounded-full bg-white/30 blur-[10px] z-20 pointer-events-none" />
+        <div className="absolute inset-y-4 left-2 w-px bg-gradient-to-b from-transparent via-white/60 to-transparent z-20 pointer-events-none" />
+        <div className="absolute inset-y-5 right-2 w-px bg-gradient-to-b from-transparent via-white/36 to-transparent z-20 pointer-events-none" />
 
         {/* Avatar area — fills top portion */}
-        <div className="relative w-full flex-1 overflow-hidden" style={{ minHeight: 0 }}>
+        <div className="relative z-30 mx-2 mt-2 mb-0 flex-1 rounded-[20px] sm:rounded-[24px]"
+          style={{
+            minHeight: 0,
+            transform: 'translateZ(46px)',
+            animation: 'raised-media-float 5.6s ease-in-out infinite',
+          }}>
+          <div className="absolute -inset-2 rounded-[24px] sm:rounded-[28px] bg-[radial-gradient(ellipse_at_50%_20%,rgba(255,255,255,0.55),transparent_42%),linear-gradient(145deg,rgba(255,255,255,0.36),rgba(226,250,255,0.14))] blur-[6px] opacity-70 pointer-events-none" />
+          <div className="absolute -inset-1 rounded-[22px] sm:rounded-[26px] pointer-events-none"
+            style={{
+              background: 'linear-gradient(145deg, rgba(255,255,255,0.92), rgba(226,250,255,0.22) 36%, rgba(14,45,60,0.18) 100%)',
+              boxShadow: '0 26px 38px -24px rgba(14,45,60,0.62), 0 18px 28px -22px rgba(69,10,10,0.58)',
+            }} />
+          <div className="absolute -bottom-3 left-[12%] right-[12%] h-7 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(69,10,10,0.42),transparent_70%)] blur-lg pointer-events-none" />
+          <div className="relative h-full w-full overflow-hidden rounded-[20px] sm:rounded-[24px]"
+            style={{
+              boxShadow: '0 18px 30px -20px rgba(14,45,60,0.72), inset 0 1px 0 rgba(255,255,255,0.85), inset 0 -1px 0 rgba(14,45,60,0.18)',
+              border: '1px solid rgba(255,255,255,0.78)',
+            }}>
           {/* Avatar image */}
           <div className="w-full h-full relative">
             {teacher.avatar_url
-              ? <img src={teacher.avatar_url} alt={teacher.full_name} className="w-full h-full object-cover object-top" />
+              ? <img src={teacher.avatar_url} alt={teacher.full_name} className="block w-full h-full object-cover object-top" style={{ filter: 'contrast(1.06) saturate(1.06)', transform: 'translateZ(0)' }} />
               : <div className="w-full h-full flex items-center justify-center" style={{ background: cfg.badgeBg }}>
                   <span className={cn('font-black text-gray-400', isFirst ? 'text-3xl sm:text-5xl' : 'text-2xl sm:text-3xl')}>{initials(teacher.full_name)}</span>
                 </div>
@@ -460,24 +506,46 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
 
           {/* Score badge — overlaid bottom-center of image */}
           <div className={cn(
-            "absolute bottom-3 left-1/2 -translate-x-1/2 z-20 rounded-full font-black tracking-wider flex items-center gap-1 px-3 py-1 shadow-sm",
-            isFirst ? "text-[11px] sm:text-[13px]" : "text-[10px] sm:text-[11px]"
+            "absolute bottom-3 left-1/2 -translate-x-1/2 z-20 rounded-full font-black tracking-[0.06em] flex items-center gap-1.5 px-4 py-1.5 backdrop-blur-2xl overflow-hidden",
+            isFirst ? "text-[12px] sm:text-[14px]" : "text-[10px] sm:text-[12px]"
           )}
             style={{
               background: cfg.scoreBg,
               color: cfg.scoreTextColor,
               border: cfg.scoreBorder,
+              animation: 'glass-score-pop 3.6s ease-in-out infinite',
+              backdropFilter: 'blur(28px) saturate(2.05) contrast(1.08)',
+              WebkitBackdropFilter: 'blur(28px) saturate(2.05) contrast(1.08)',
             }}>
-            <Trophy className={cn("w-3 h-3 sm:w-3.5 sm:h-3.5", "text-yellow-500 fill-yellow-500")} />
-            <span className="leading-none">
+            <span className="absolute inset-0 rounded-full bg-gradient-to-r from-sky-100/34 via-white/18 to-cyan-100/34" />
+            <span className="absolute inset-[1px] rounded-full border border-white/68 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),inset_0_-1px_2px_rgba(74,144,172,0.22)]" />
+            <span className="absolute inset-x-3 top-1 h-[44%] rounded-full bg-white/74 blur-[3px]" />
+            <span className="absolute left-1/2 top-1/2 h-[150%] w-[76%] rounded-full bg-[linear-gradient(90deg,rgba(239,68,68,0.42),rgba(251,146,60,0.58),rgba(255,255,255,0.18))]" style={{ animation: 'liquid-hot-flow 4.8s ease-in-out infinite' }} />
+            <span className="absolute -left-6 top-1/2 h-[145%] w-[58%] -translate-y-1/2 rounded-full bg-white/42 blur-[7px] mix-blend-screen" style={{ animation: 'liquid-score-flow 4.2s ease-in-out infinite' }} />
+            <span className="absolute -right-4 bottom-[-35%] h-[90%] w-[46%] rounded-full bg-cyan-100/36 blur-[8px]" />
+            <span className="absolute inset-x-2 bottom-1 h-px bg-gradient-to-r from-transparent via-cyan-50/80 to-transparent" />
+            <Trophy className={cn("relative z-10 w-3.5 h-3.5 sm:w-4 sm:h-4", "text-yellow-500 fill-yellow-500 drop-shadow-[0_1px_4px_rgba(245,158,11,0.45)]")} />
+            <span className="relative z-10 leading-none drop-shadow-[0_1px_0_rgba(255,255,255,0.7)]">
               {displayScore.toFixed(2)}%
             </span>
+          </div>
           </div>
         </div>
 
         {/* Caption — white bottom section */}
-        <div className="relative z-20 px-2 sm:px-3 py-3 sm:py-4 flex flex-col items-center justify-center gap-1.5" style={{ background: cfg.captionBg }}>
-          <h4 className="w-full font-black leading-tight tracking-tight text-center"
+        <div className="relative z-40 mx-3 mb-3 mt-2 rounded-[18px] sm:rounded-[22px] px-2 sm:px-3 py-3 sm:py-4 flex flex-col items-center justify-center gap-1.5 overflow-hidden"
+          style={{
+            background: cfg.captionBg,
+            border: `1px solid ${cfg.captionBorder}`,
+            backdropFilter: 'blur(18px) saturate(1.6)',
+            WebkitBackdropFilter: 'blur(18px) saturate(1.6)',
+            boxShadow: '0 22px 34px -24px rgba(14,45,60,0.52), 0 12px 22px -18px rgba(69,10,10,0.34), inset 0 1px 0 rgba(255,255,255,0.9), inset 0 -1px 0 rgba(14,45,60,0.12)',
+            transform: 'translateZ(58px) translateY(-1px)',
+          }}>
+          <div className="absolute -bottom-4 left-[10%] right-[10%] h-6 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(69,10,10,0.28),transparent_72%)] blur-md pointer-events-none" style={{ animation: 'raised-info-glow 4.8s ease-in-out infinite' }} />
+          <div className="absolute inset-x-4 top-1 h-[32%] rounded-full bg-white/46 blur-[8px]" />
+          <div className="absolute top-0 left-8 right-8 h-px" style={{ background: cfg.accentLine }} />
+          <h4 className="relative w-full font-black leading-tight tracking-tight text-center"
             style={{
               color: cfg.textColor,
               fontSize: nameFontSize,
@@ -488,11 +556,12 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
             }}>
             {teacher.full_name}
           </h4>
-          <div className="inline-flex items-center justify-center px-3 py-0.5 rounded-full border border-gray-200 bg-white shadow-sm"
+          <div className="relative inline-flex max-w-full items-center justify-center px-3 py-1 rounded-full border border-gray-200 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-xl overflow-hidden"
             style={{
               border: cfg.badgeBorder,
               background: cfg.badgeBg,
             }}>
+            <span className="absolute inset-x-2 top-0 h-1/2 rounded-full bg-white/42 blur-[3px]" />
             <p className="font-bold text-center leading-snug"
               style={{
                 color: cfg.subTextColor,
@@ -640,16 +709,29 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
         @keyframes card-slide-right { from { opacity:0; transform:translateX(20px) rotate(4deg) scale(0.95); } to { opacity:1; transform:translateX(0) rotate(2.5deg) scale(1); } }
         @keyframes title-reveal { from { opacity:0; transform:translateY(16px); filter:blur(4px); } to { opacity:1; transform:translateY(0); filter:blur(0); } }
         @keyframes sparkle-pop { 0% { transform:translate(-50%,-50%) scale(0) rotate(0deg); opacity:1; } 50% { transform:translate(-50%,-80%) scale(1.4) rotate(180deg); opacity:0.9; } 100% { transform:translate(-50%,-120%) scale(0) rotate(360deg); opacity:0; } }
-        @keyframes float-orb { 0%,100% { transform:translateY(0) translateX(0) scale(1); } 33% { transform:translateY(-22px) translateX(10px) scale(1.1); } 66% { transform:translateY(-10px) translateX(-12px) scale(0.93); } }
-        @keyframes wave-slow { 0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); } 33% { transform: translate(-3%, 2%) scale(1.06) rotate(3deg); } 66% { transform: translate(2%, -3%) scale(0.97) rotate(-2deg); } }
-        @keyframes wave-medium { 0%, 100% { transform: translate(0, 0) scale(1.1) rotate(0deg); } 33% { transform: translate(3%, -2%) scale(1.02) rotate(-4deg); } 66% { transform: translate(-2%, 3%) scale(1.12) rotate(2deg); } }
-        @keyframes wave-fast { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(4%, -4%) scale(0.94); } }
-        @keyframes drift-slow { 0% { transform: translateX(-12%) translateY(0) rotate(-15deg); } 50% { transform: translateX(12%) translateY(-6%) rotate(-15deg); } 100% { transform: translateX(-12%) translateY(0) rotate(-15deg); } }
+        @keyframes light-sweep { 0% { transform: translateX(-26%) rotate(-16deg); opacity: 0.05; } 45% { opacity: 0.18; } 100% { transform: translateX(26%) rotate(-16deg); opacity: 0.05; } }
+        @keyframes ribbon-flow { 0%,100% { transform: translate3d(-2%,0,0) rotate(-5deg); } 50% { transform: translate3d(2%,-3%,0) rotate(-3deg); } }
+        @keyframes velvet-wave-drift { 0%,100% { transform: translate3d(-3%,0,0) rotate(-5deg) scale(1.02); } 50% { transform: translate3d(3%,-3%,0) rotate(-3deg) scale(1.08); } }
+        @keyframes velvet-wave-drift-reverse { 0%,100% { transform: translate3d(3%,0,0) rotate(5deg) scale(1.04); } 50% { transform: translate3d(-3%,3%,0) rotate(2deg) scale(1.1); } }
+        @keyframes wine-wave-pulse { 0%,100% { opacity: 0.42; filter: blur(0px); } 50% { opacity: 0.68; filter: blur(0.4px); } }
+        @keyframes fabric-light-sweep { 0%,100% { transform: translate3d(-7%, -2%, 0) rotate(-6deg) scaleX(1); opacity: 0.28; } 50% { transform: translate3d(7%, 2%, 0) rotate(-3deg) scaleX(1.08); opacity: 0.52; } }
+        @keyframes fabric-shadow-breathe { 0%,100% { opacity: 0.48; transform: scale(1) rotate(-4deg); } 50% { opacity: 0.72; transform: scale(1.04) rotate(-2deg); } }
+        @keyframes stage-wave-cross-a { 0%,100% { transform: translate3d(-1%,0,0) rotate(-8deg) scale(1.02); } 50% { transform: translate3d(1.5%,-1%,0) rotate(-5deg) scale(1.04); } }
+        @keyframes stage-wave-cross-b { 0%,100% { transform: translate3d(1%,0,0) rotate(7deg) scale(1.03); } 50% { transform: translate3d(-1.5%,1%,0) rotate(4deg) scale(1.05); } }
+        @keyframes stage-wave-cross-c { 0%,100% { transform: translate3d(-1%,0.5%,0) rotate(-4deg) scale(1.02); } 50% { transform: translate3d(1%,-0.5%,0) rotate(-2deg) scale(1.035); } }
+        @keyframes stage-wave-glow { 0%,100% { opacity: 0.24; transform: translate3d(-2%,0,0) rotate(5deg); } 50% { opacity: 0.42; transform: translate3d(2%,-1%,0) rotate(2deg); } }
+        @keyframes raised-media-float { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-2px) scale(1.006); } }
+        @keyframes raised-info-glow { 0%,100% { opacity: 0.45; transform: scaleX(0.96); } 50% { opacity: 0.7; transform: scaleX(1.04); } }
+        @keyframes foil-shine { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        @keyframes title-glow { 0%,100% { text-shadow: 0 2px 10px rgba(69,10,10,0.36), 0 0 18px rgba(255,214,120,0.16); } 50% { text-shadow: 0 2px 12px rgba(69,10,10,0.44), 0 0 28px rgba(255,214,120,0.32); } }
+        @keyframes liquid-caustic { 0%,100% { transform: translate3d(-4%, -2%, 0) rotate(-8deg) scale(1); opacity: 0.42; } 50% { transform: translate3d(5%, 3%, 0) rotate(-4deg) scale(1.08); opacity: 0.68; } }
+        @keyframes liquid-breathe { 0%,100% { transform: scale(1); opacity: 0.58; } 50% { transform: scale(1.035); opacity: 0.82; } }
+        @keyframes glass-score-pop { 0%,100% { box-shadow: 0 14px 28px rgba(69,10,10,0.22), 0 0 0 1px rgba(255,255,255,0.42) inset, inset 0 1px 0 rgba(255,255,255,0.98), inset 0 -12px 22px rgba(255,255,255,0.2); } 50% { box-shadow: 0 18px 38px rgba(69,10,10,0.3), 0 0 0 1px rgba(255,255,255,0.58) inset, inset 0 1px 0 rgba(255,255,255,1), inset 0 -14px 26px rgba(255,244,200,0.34); } }
+        @keyframes liquid-score-flow { 0%,100% { transform: translateX(-18%) rotate(-8deg) scaleX(0.92); opacity: 0.35; } 45% { opacity: 0.78; } 50% { transform: translateX(18%) rotate(-5deg) scaleX(1.08); } }
+        @keyframes liquid-hot-flow { 0%,100% { transform: translateX(-22%) translateY(-50%) rotate(-12deg) scaleX(0.9); filter: blur(7px); } 50% { transform: translateX(18%) translateY(-50%) rotate(-7deg) scaleX(1.16); filter: blur(9px); } }
+        @keyframes apple-card-flow { 0%,100% { transform: translate3d(-18%,-6%,0) rotate(-12deg) scaleX(0.92); opacity: 0.28; } 45% { opacity: 0.52; } 50% { transform: translate3d(18%,4%,0) rotate(-7deg) scaleX(1.12); } }
         @keyframes ripple-out { 0% { transform: translate(-50%,-50%) scale(0.3); opacity: 0.7; } 100% { transform: translate(-50%,-50%) scale(2.8); opacity: 0; } }
         @keyframes ripple-out-2 { 0% { transform: translate(-50%,-50%) scale(0.5); opacity: 0.5; } 100% { transform: translate(-50%,-50%) scale(3.2); opacity: 0; } }
-        @keyframes orb-drift-1 { 0%,100% { transform: translate(0,0) scale(1); } 25% { transform: translate(8%,-6%) scale(1.08); } 50% { transform: translate(-4%,8%) scale(0.95); } 75% { transform: translate(-8%,-3%) scale(1.05); } }
-        @keyframes orb-drift-2 { 0%,100% { transform: translate(0,0) scale(1); } 25% { transform: translate(-6%,8%) scale(1.1); } 50% { transform: translate(10%,4%) scale(0.92); } 75% { transform: translate(4%,-8%) scale(1.06); } }
-        @keyframes orb-drift-3 { 0%,100% { transform: translate(0,0) scale(1.05); } 25% { transform: translate(5%,10%) scale(0.95); } 50% { transform: translate(-8%,-5%) scale(1.12); } 75% { transform: translate(6%,-8%) scale(0.98); } }
         @keyframes pulse-soft { 0%, 100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 0.55; transform: scale(1.12); } }
         .anim-slide-left { animation: card-slide-left 0.6s cubic-bezier(0.34,1.25,0.64,1) 0.4s both; }
         .anim-slide-center { animation: card-slide-center 0.7s cubic-bezier(0.34,1.35,0.64,1) 0.3s both; }
@@ -658,105 +740,134 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
 
         .card-podium-1 {
           width: 36%;
-          height: 290px;
+          height: 304px;
         }
         .card-podium-2 {
           width: 31%;
-          height: 262px;
+          height: 274px;
         }
         .card-podium-3 {
           width: 28%;
-          height: 238px;
+          height: 250px;
         }
         @media (min-width: 640px) {
           .card-podium-1 {
             width: 34%;
-            height: 348px;
+            height: 370px;
           }
           .card-podium-2 {
             width: 30%;
-            height: 316px;
+            height: 332px;
           }
           .card-podium-3 {
             width: 26%;
-            height: 282px;
+            height: 296px;
           }
         }
         @media (min-width: 768px) {
           .card-podium-1 {
-            width: 260px;
-            height: 420px;
+            width: 286px;
+            height: 446px;
           }
           .card-podium-2 {
-            width: 228px;
-            height: 380px;
+            width: 246px;
+            height: 402px;
           }
           .card-podium-3 {
-            width: 196px;
-            height: 340px;
+            width: 218px;
+            height: 360px;
           }
         }
       `}</style>
 
        <div
          ref={cardRef}
-         className={cn('relative w-full max-w-[820px] max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] pointer-events-auto overflow-y-auto overflow-x-hidden rounded-[1.35rem] sm:rounded-[2rem] transition-opacity duration-300', showCard ? 'opacity-100' : 'opacity-0 pointer-events-none')}
+         className={cn('relative w-full max-w-[980px] max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] pointer-events-auto overflow-y-auto overflow-x-hidden rounded-[1.35rem] sm:rounded-[2rem] transition-opacity duration-300', showCard ? 'opacity-100' : 'opacity-0 pointer-events-none')}
          style={{
-           background: 'radial-gradient(ellipse at 30% 20%, #9f1239 0%, #be123c 25%, #dc2626 50%, #b91c1c 75%, #7f1d1d 100%)',
-           boxShadow: '0 32px 80px -16px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.15)',
+           background: 'linear-gradient(135deg, #8f101f 0%, #c21c27 34%, #e43728 58%, #9b1219 100%)',
+           boxShadow: '0 38px 96px -22px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.18), inset 0 1px 0 rgba(255,255,255,0.28)',
            transform: 'translateZ(0)',
          }}
        >
         <ConfettiRain active={activeConfetti} />
         <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-[1.35rem] sm:rounded-[2rem]">
 
-          {/* ── Deep crimson base wave orbs ── */}
-          <div className="absolute -top-[20%] -left-[15%] w-[75%] h-[75%] rounded-full blur-[90px]"
-            style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.55) 0%, rgba(185,28,28,0.25) 60%, transparent 100%)', animation: 'orb-drift-1 18s ease-in-out infinite' }} />
-          <div className="absolute -bottom-[20%] -right-[15%] w-[80%] h-[80%] rounded-full blur-[100px]"
-            style={{ background: 'radial-gradient(circle, rgba(220,38,38,0.5) 0%, rgba(153,27,27,0.2) 60%, transparent 100%)', animation: 'orb-drift-2 22s ease-in-out infinite' }} />
-          <div className="absolute top-[30%] -right-[20%] w-[65%] h-[65%] rounded-full blur-[80px]"
-            style={{ background: 'radial-gradient(circle, rgba(185,28,28,0.45) 0%, transparent 70%)', animation: 'orb-drift-3 16s ease-in-out infinite' }} />
+          {/* ── Velvet stage depth ── */}
+          <div className="absolute inset-0"
+            style={{
+              background: [
+                'radial-gradient(ellipse at 50% 40%, rgba(255,214,120,0.18) 0%, rgba(255,214,120,0.06) 25%, transparent 54%)',
+                'radial-gradient(ellipse at 50% 115%, rgba(69,10,10,0.58) 0%, transparent 48%)',
+                'linear-gradient(90deg, rgba(69,10,10,0.36), transparent 22%, transparent 78%, rgba(69,10,10,0.44))',
+                'linear-gradient(135deg, rgba(77,8,14,0.82) 0%, rgba(159,18,32,0.38) 42%, rgba(84,9,16,0.72) 100%)',
+              ].join(', '),
+            }} />
 
-          {/* ── Gold / amber accent waves ── */}
-          <div className="absolute top-[5%] left-[40%] w-[45%] h-[40%] rounded-full blur-[70px]"
-            style={{ background: 'radial-gradient(circle, rgba(251,191,36,0.28) 0%, rgba(245,158,11,0.12) 60%, transparent 100%)', animation: 'wave-slow 14s ease-in-out infinite' }} />
-          <div className="absolute bottom-[5%] left-[10%] w-[50%] h-[40%] rounded-full blur-[75px]"
-            style={{ background: 'radial-gradient(circle, rgba(234,179,8,0.22) 0%, transparent 70%)', animation: 'wave-medium 17s ease-in-out infinite reverse' }} />
-          <div className="absolute top-[50%] left-[25%] w-[35%] h-[35%] rounded-full blur-[60px]"
-            style={{ background: 'radial-gradient(circle, rgba(253,224,71,0.18) 0%, transparent 70%)', animation: 'wave-fast 10s ease-in-out infinite' }} />
+          {/* ── Smooth red stage waves ── */}
+          <div className="absolute inset-0 opacity-[0.07] mix-blend-overlay"
+            style={{
+              backgroundImage: 'linear-gradient(90deg, rgba(255,255,255,0.16) 0 1px, transparent 1px), linear-gradient(0deg, rgba(69,10,10,0.2) 0 1px, transparent 1px)',
+              backgroundSize: '240px 240px, 240px 240px',
+            }} />
+          <div className="absolute -left-[16%] top-[6%] h-[34%] w-[118%] opacity-42 mix-blend-multiply"
+            style={{
+              backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'1200\' height=\'320\' viewBox=\'0 0 1200 320\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M-90 58 C 150 10 310 122 522 108 C 720 96 882 42 1290 20 L1290 166 C 1016 248 786 228 548 168 C 334 114 132 134 -90 214 Z\' fill=\'%23550710\' opacity=\'.62\'/%3E%3Cpath d=\'M-90 188 C 152 104 340 170 558 202 C 780 236 1008 194 1290 120 L1290 320 L-90 320 Z\' fill=\'%23880f1b\' opacity=\'.42\'/%3E%3C/svg%3E")',
+              backgroundSize: '100% 100%',
+              backgroundRepeat: 'no-repeat',
+              animation: 'stage-wave-cross-a 20s ease-in-out infinite',
+            }} />
+          <div className="absolute -right-[18%] top-[15%] h-[36%] w-[116%] opacity-36 mix-blend-multiply"
+            style={{
+              backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'1200\' height=\'360\' viewBox=\'0 0 1200 360\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M-80 64 C 180 182 372 196 602 150 C 788 112 978 70 1280 132 L1280 360 L-80 360 Z\' fill=\'%237a0c17\' opacity=\'.56\'/%3E%3Cpath d=\'M-80 150 C 190 228 402 264 626 206 C 836 152 1014 138 1280 202 L1280 360 L-80 360 Z\' fill=\'%23b91c1c\' opacity=\'.28\'/%3E%3C/svg%3E")',
+              backgroundSize: '100% 100%',
+              backgroundRepeat: 'no-repeat',
+              animation: 'stage-wave-cross-b 24s ease-in-out infinite',
+            }} />
+          <div className="absolute -left-[12%] bottom-[4%] h-[32%] w-[114%] opacity-32 mix-blend-multiply"
+            style={{
+              backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'1200\' height=\'320\' viewBox=\'0 0 1200 320\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M-90 96 C 130 26 310 70 504 142 C 732 226 936 198 1290 84 L1290 320 L-90 320 Z\' fill=\'%235b0810\' opacity=\'.6\'/%3E%3Cpath d=\'M-90 176 C 154 88 354 134 570 214 C 790 296 1012 250 1290 164 L1290 320 L-90 320 Z\' fill=\'%239b1219\' opacity=\'.46\'/%3E%3C/svg%3E")',
+              backgroundSize: '100% 100%',
+              backgroundRepeat: 'no-repeat',
+              animation: 'stage-wave-cross-c 26s ease-in-out infinite reverse',
+            }} />
+          <div className="absolute -left-[22%] top-[25%] h-[28%] w-[126%] opacity-34 mix-blend-screen blur-[12px]"
+            style={{
+              background: 'linear-gradient(96deg, transparent 0%, rgba(255,124,90,0.12) 24%, rgba(255,255,255,0.16) 45%, rgba(255,190,120,0.14) 62%, transparent 100%)',
+              animation: 'stage-wave-glow 16s ease-in-out infinite',
+            }} />
 
-          {/* ── Rose / pink accent ── */}
-          <div className="absolute top-[15%] -left-[5%] w-[40%] h-[45%] rounded-full blur-[65px]"
-            style={{ background: 'radial-gradient(circle, rgba(244,63,94,0.3) 0%, rgba(190,18,60,0.12) 60%, transparent 100%)', animation: 'orb-drift-2 20s ease-in-out infinite 3s' }} />
-          <div className="absolute -bottom-[10%] right-[20%] w-[45%] h-[40%] rounded-full blur-[70px]"
-            style={{ background: 'radial-gradient(circle, rgba(251,113,133,0.22) 0%, transparent 70%)', animation: 'orb-drift-1 24s ease-in-out infinite 5s' }} />
-
-          {/* ── Orange warm glow ── */}
-          <div className="absolute top-[60%] -left-[10%] w-[50%] h-[50%] rounded-full blur-[80px]"
-            style={{ background: 'radial-gradient(circle, rgba(251,146,60,0.25) 0%, rgba(234,88,12,0.1) 60%, transparent 100%)', animation: 'wave-slow 19s ease-in-out infinite reverse' }} />
+          {/* ── Award ribbons and stage lights ── */}
+          <div className="absolute -left-[18%] top-[12%] h-[26%] w-[136%] opacity-45 blur-[18px]"
+            style={{ background: 'linear-gradient(96deg, transparent 0%, rgba(255,236,170,0.18) 26%, rgba(255,255,255,0.18) 50%, rgba(255,185,80,0.16) 74%, transparent 100%)', animation: 'ribbon-flow 14s ease-in-out infinite' }} />
+          <div className="absolute -left-[24%] bottom-[9%] h-[22%] w-[150%] opacity-36 blur-[22px]"
+            style={{ background: 'linear-gradient(84deg, transparent 0%, rgba(255,255,255,0.14) 30%, rgba(255,213,104,0.18) 50%, rgba(255,255,255,0.11) 68%, transparent 100%)', animation: 'ribbon-flow 18s ease-in-out infinite reverse' }} />
+          <div className="absolute top-[-25%] left-[12%] h-[145%] w-[18%] origin-top blur-[24px]"
+            style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,221,120,0.13) 44%, transparent 82%)', animation: 'light-sweep 11s ease-in-out infinite' }} />
+          <div className="absolute top-[-25%] right-[14%] h-[145%] w-[20%] origin-top blur-[28px]"
+            style={{ background: 'linear-gradient(180deg, rgba(255,239,192,0.24), rgba(255,255,255,0.1) 46%, transparent 84%)', animation: 'light-sweep 13s ease-in-out infinite reverse' }} />
 
           {/* ── Ripple rings emanating from center ── */}
-          <div className="absolute pointer-events-none" style={{ top: '38%', left: '50%', width: '280px', height: '280px', border: '1.5px solid rgba(251,191,36,0.22)', borderRadius: '50%', animation: 'ripple-out 5s ease-out infinite' }} />
-          <div className="absolute pointer-events-none" style={{ top: '38%', left: '50%', width: '280px', height: '280px', border: '1.5px solid rgba(239,68,68,0.2)', borderRadius: '50%', animation: 'ripple-out 5s ease-out infinite 1.67s' }} />
-          <div className="absolute pointer-events-none" style={{ top: '38%', left: '50%', width: '280px', height: '280px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '50%', animation: 'ripple-out 5s ease-out infinite 3.33s' }} />
+          <div className="absolute pointer-events-none" style={{ top: '45%', left: '50%', width: '320px', height: '320px', border: '1.5px solid rgba(251,191,36,0.22)', borderRadius: '50%', animation: 'ripple-out 5.6s ease-out infinite' }} />
+          <div className="absolute pointer-events-none" style={{ top: '45%', left: '50%', width: '320px', height: '320px', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '50%', animation: 'ripple-out 5.6s ease-out infinite 2.8s' }} />
 
-          {/* ── Diagonal light streaks ── */}
-          <div className="absolute top-1/4 -left-1/4 w-[150%] h-[25%] blur-[80px] opacity-[0.12]"
-            style={{ background: 'linear-gradient(90deg, transparent, rgba(255,220,100,0.5), rgba(255,255,255,0.3), transparent)', animation: 'drift-slow 28s linear infinite' }} />
-          <div className="absolute bottom-1/4 -right-1/4 w-[150%] h-[20%] blur-[90px] opacity-[0.10]"
-            style={{ background: 'linear-gradient(90deg, transparent, rgba(251,146,60,0.4), rgba(255,255,255,0.2), transparent)', animation: 'drift-slow 36s linear infinite reverse' }} />
+          {/* ── Fine gold foil field ── */}
+          <div className="absolute inset-0 opacity-[0.22] mix-blend-screen"
+            style={{
+              backgroundImage: 'radial-gradient(circle at 12% 18%, rgba(255,236,170,0.9) 0 1px, transparent 2px), radial-gradient(circle at 78% 26%, rgba(255,255,255,0.72) 0 1px, transparent 2px), radial-gradient(circle at 30% 72%, rgba(255,210,90,0.7) 0 1px, transparent 2px), radial-gradient(circle at 92% 68%, rgba(255,255,255,0.62) 0 1px, transparent 2px)',
+              backgroundSize: '96px 96px, 118px 118px, 132px 132px, 84px 84px',
+            }} />
 
           {/* ── Fine grain texture overlay ── */}
           <div className="absolute inset-0 opacity-[0.025] mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")', backgroundSize: '180px 180px' }} />
         </div>
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+        <div className="absolute inset-0 pointer-events-none rounded-[1.35rem] sm:rounded-[2rem]" style={{ boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.16), inset 0 -80px 120px rgba(69,10,10,0.28)' }} />
         {showCard && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-[1.35rem] sm:rounded-[2rem]">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full border border-white/30" style={{ animation: 'ring-expand 1.3s ease-out 0.05s both' }} />
           </div>
         )}
-         <button onClick={onClose} className="absolute top-2.5 right-2.5 sm:top-4 sm:right-4 z-30 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center group transition-all duration-200 hover:scale-110" style={{ background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.4)', backdropFilter: 'blur(8px)' }} aria-label="Đóng">
+         <button onClick={onClose} className="absolute top-2.5 right-2.5 sm:top-4 sm:right-4 z-30 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group transition-all duration-200 hover:scale-110" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.16), rgba(69,10,10,0.32))', border: '1px solid rgba(255, 255, 255, 0.48)', backdropFilter: 'blur(12px) saturate(1.4)', boxShadow: '0 10px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.34)' }} aria-label="Đóng">
            <X className="w-4 h-4 text-white/80 group-hover:text-white group-hover:rotate-90 transition-all duration-300" />
          </button>
          <div className="absolute inset-y-0 left-0 right-0 z-30 pointer-events-none flex items-center justify-between px-2 sm:px-4">
@@ -788,32 +899,41 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
              />
            ))}
          </div>
-         <div className="relative z-10 min-h-[720px] px-3 pb-5 pt-5 sm:min-h-[760px] sm:px-5 sm:pb-7 sm:pt-7 md:min-h-[740px] md:px-8">
-           <div className={cn('absolute inset-x-3 top-5 transition-all duration-700 sm:inset-x-5 sm:top-7 md:inset-x-8', activePanel === 'honors' ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-3')}>
+         <div className="relative z-10 min-h-[720px] px-3 pb-5 pt-5 sm:min-h-[760px] sm:px-5 sm:pb-7 sm:pt-7 md:min-h-[740px] md:px-10">
+           <div className={cn('absolute inset-x-3 top-5 transition-all duration-700 sm:inset-x-5 sm:top-7 md:inset-x-10', activePanel === 'honors' ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-3')}>
            <div className={cn('text-center mb-4 sm:mb-7', contentPhase >= 1 ? 'anim-title-reveal' : 'opacity-0')}>
-             <div className="inline-flex max-w-[calc(100%-3rem)] items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2 rounded-full mb-3 sm:mb-4 relative"
+             <div className="inline-flex max-w-[calc(100%-3rem)] items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-7 py-2 rounded-full mb-3 sm:mb-4 relative overflow-hidden"
                style={{
-                 background: 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.18) 100%)',
+                 background: 'linear-gradient(135deg, rgba(255,255,255,0.24) 0%, rgba(255,236,170,0.15) 44%, rgba(255,255,255,0.19) 100%)',
                  backdropFilter: 'blur(24px) saturate(1.6)',
                  WebkitBackdropFilter: 'blur(24px) saturate(1.6)',
-                 border: '1px solid rgba(255,255,255,0.5)',
-                 boxShadow: '0 2px 16px rgba(0,0,0,0.25), 0 1px 0 rgba(255,255,255,0.75) inset, 0 -1px 0 rgba(0,0,0,0.1) inset',
+                 border: '1px solid rgba(255,255,255,0.56)',
+                 boxShadow: '0 12px 30px rgba(69,10,10,0.22), 0 1px 0 rgba(255,255,255,0.75) inset, 0 -1px 0 rgba(0,0,0,0.1) inset',
                  borderRadius: '999px',
                }}>
                {/* top gloss strip */}
                <div className="absolute left-[8%] right-[8%] top-[3px] h-[38%] rounded-full pointer-events-none"
                  style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0.5), rgba(255,255,255,0.08))', filter: 'blur(1px)' }} />
-               <span className="text-white/95 text-sm leading-none relative" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)', zIndex: 1 }}>★</span>
-               <span className="text-[8px] sm:text-[10px] md:text-[11px] font-black tracking-[0.12em] sm:tracking-[0.2em] uppercase leading-tight"
+               <Star className="relative z-[1] h-3.5 w-3.5 fill-white text-white drop-shadow-[0_2px_7px_rgba(0,0,0,0.32)]" />
+               <span className="text-[8px] sm:text-[10px] md:text-[12px] font-black tracking-[0.12em] sm:tracking-[0.24em] uppercase leading-tight"
                  style={{ color: 'rgba(255,255,255,0.97)', textShadow: '0 1px 6px rgba(0,0,0,0.5)', position: 'relative', zIndex: 1 }}>
                  Bảng Vinh Danh Giảng Viên Xuất Sắc
                </span>
-               <span className="text-white/95 text-sm leading-none relative" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)', zIndex: 1 }}>★</span>
+               <Star className="relative z-[1] h-3.5 w-3.5 fill-white text-white drop-shadow-[0_2px_7px_rgba(0,0,0,0.32)]" />
              </div>
-             <h1 className="text-[1.55rem] sm:text-[2rem] md:text-[2.4rem] font-black tracking-tight leading-none mb-2 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.3)]">VINH DANH NGÔI SAO ĐÀO TẠO</h1>
-             <p className="text-[12px] sm:text-[15px] text-white/90 font-extrabold tracking-wide sm:tracking-widest drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]">TẬN TÂM TRÊN TỪNG BÀI GIẢNG &nbsp;·&nbsp; TRUYỀN CẢM HỨNG MỖI NGÀY</p>
+             <h1 className="mx-auto max-w-[900px] text-[1.7rem] sm:text-[2.45rem] md:text-[3.15rem] font-black tracking-tight leading-[0.95] mb-2.5 text-white"
+               style={{ animation: 'title-glow 3.8s ease-in-out infinite' }}>
+               VINH DANH NGÔI SAO ĐÀO TẠO
+             </h1>
+             <div className="mx-auto flex max-w-[760px] items-center justify-center gap-2 sm:gap-3">
+               <span className="hidden sm:block h-px flex-1 bg-gradient-to-r from-transparent via-yellow-200/58 to-transparent" />
+               <p className="text-[11px] sm:text-[14px] md:text-[15px] text-white/92 font-extrabold tracking-[0.08em] sm:tracking-[0.18em] drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]">TẬN TÂM TRÊN TỪNG BÀI GIẢNG · TRUYỀN CẢM HỨNG MỖI NGÀY</p>
+               <span className="hidden sm:block h-px flex-1 bg-gradient-to-r from-transparent via-yellow-200/58 to-transparent" />
+             </div>
            </div>
-          <div className={cn('flex items-end justify-center gap-1.5 sm:gap-3 md:gap-6 mt-6 sm:mt-8 md:mt-[40px] mb-4 sm:mb-5 md:mb-5 w-full px-0 sm:px-2', contentPhase >= 2 ? '' : 'opacity-0')}>
+          <div className={cn('relative flex items-end justify-center gap-1.5 sm:gap-4 md:gap-8 mt-6 sm:mt-8 md:mt-[42px] mb-6 sm:mb-7 md:mb-[32px] w-full px-0 sm:px-2', contentPhase >= 2 ? '' : 'opacity-0')}>
+            <div className="absolute left-[5%] right-[5%] bottom-[-18px] h-[42px] rounded-[999px] opacity-65 blur-xl"
+              style={{ background: 'radial-gradient(ellipse at 50% 50%, rgba(69,10,10,0.42), transparent 68%)' }} />
             {podium.map((teacher, idx) => {
               const isFirst = idx === 1
               const animCls = contentPhase >= 2 ? (isFirst ? 'anim-slide-center' : idx === 0 ? 'anim-slide-left' : 'anim-slide-right') : 'opacity-0'
@@ -822,24 +942,24 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
           </div>
            <div className={cn('transition-all duration-700', contentPhase >= 3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2')} style={{ transitionDelay: contentPhase >= 3 ? '0.6s' : '0s' }}>
              <div className="flex items-center justify-center mb-3 sm:mb-4">
-               <div className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2 rounded-full relative"
+               <div className="inline-flex max-w-[calc(100%-1.5rem)] items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-7 py-2 rounded-full relative overflow-hidden"
                    style={{
-                            background: 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.18) 100%)',
+                            background: 'linear-gradient(135deg, rgba(255,255,255,0.24) 0%, rgba(255,236,170,0.15) 44%, rgba(255,255,255,0.19) 100%)',
                             backdropFilter: 'blur(24px) saturate(1.6)',
                             WebkitBackdropFilter: 'blur(24px) saturate(1.6)',
-                            border: '1px solid rgba(255,255,255,0.5)',
-                            boxShadow: '0 2px 16px rgba(0,0,0,0.25), 0 1px 0 rgba(255,255,255,0.75) inset, 0 -1px 0 rgba(0,0,0,0.1) inset',
+                            border: '1px solid rgba(255,255,255,0.56)',
+                            boxShadow: '0 12px 30px rgba(69,10,10,0.22), 0 1px 0 rgba(255,255,255,0.75) inset, 0 -1px 0 rgba(0,0,0,0.1) inset',
                             borderRadius: '999px',
                           }}>
                  {/* top gloss strip */}
                  <div className="absolute left-[8%] right-[8%] top-[3px] h-[38%] rounded-full pointer-events-none"
                    style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0.5), rgba(255,255,255,0.08))', filter: 'blur(1px)' }} />
-                 <span className="text-white/95 text-sm leading-none relative" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)', zIndex: 1 }}>★</span>
+                 <Star className="relative z-[1] h-3.5 w-3.5 fill-white text-white drop-shadow-[0_2px_7px_rgba(0,0,0,0.32)]" />
                  <span className="text-[8px] sm:text-[10px] md:text-[11px] font-black tracking-[0.12em] sm:tracking-[0.2em] uppercase leading-tight"
                    style={{ color: 'rgba(255,255,255,0.97)', textShadow: '0 1px 6px rgba(0,0,0,0.5)', position: 'relative', zIndex: 1 }}>
                    Tôn vinh những người đưa đò thầm lặng
                  </span>
-                 <span className="text-white/95 text-sm leading-none relative" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)', zIndex: 1 }}>★</span>
+                 <Star className="relative z-[1] h-3.5 w-3.5 fill-white text-white drop-shadow-[0_2px_7px_rgba(0,0,0,0.32)]" />
                </div>
              </div>
            </div>
