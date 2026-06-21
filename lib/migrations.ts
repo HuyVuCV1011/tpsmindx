@@ -2510,6 +2510,57 @@ const migrations: Migration[] = [
       EXECUTE FUNCTION update_updated_at_column();
     `,
   },
+  {
+    name: 'V102_trang_phuc_mascot',
+    version: 102,
+    sql: `
+      CREATE TABLE IF NOT EXISTS trang_phuc_mascot (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        country_code TEXT NOT NULL,
+        flag_code TEXT NOT NULL,
+        slug TEXT NOT NULL UNIQUE,
+        colors JSONB NOT NULL DEFAULT '[]'::jsonb,
+        frames INTEGER NOT NULL DEFAULT 25,
+        status TEXT NOT NULL DEFAULT 'ready' CHECK (status IN ('draft', 'ready')),
+        available BOOLEAN NOT NULL DEFAULT true,
+        tag TEXT DEFAULT 'new',
+        color TEXT NOT NULL DEFAULT '#a1001f',
+        bg_color TEXT NOT NULL DEFAULT '#fff5f5',
+        static_mode BOOLEAN NOT NULL DEFAULT true,
+        preview_static TEXT,
+        sprite_base TEXT,
+        preview_frames JSONB,
+        jump_frames JSONB,
+        wave_frames JSONB,
+        sort_order INTEGER NOT NULL DEFAULT 100,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_trang_phuc_mascot_status_order
+        ON trang_phuc_mascot(status, available, sort_order, updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_trang_phuc_mascot_country_code
+        ON trang_phuc_mascot(country_code);
+
+      INSERT INTO trang_phuc_mascot
+        (id, name, country_code, flag_code, slug, colors, frames, status, available, tag, color, bg_color, static_mode, preview_static, sprite_base, sort_order)
+      VALUES
+        ('mascot-vn', 'Việt Nam', 'VN', 'vn', 'mascot-vn', '["#da251d", "#ffde00", "#b91c1c"]'::jsonb, 25, 'ready', true, 'new', '#dc2626', '#fff5f5', true, '/mascot/mascot-vn.png', '/mascot/mascot-vn-sheet.png', 10),
+        ('mascot-bdn', 'Bồ Đào Nha', 'PT', 'pt', 'mascot-bdn', '["#006847", "#ffcc00", "#ce1126"]'::jsonb, 25, 'ready', true, 'new', '#16a34a', '#fff5f5', true, '/mascot/mascot-bdn.png', '/mascot/mascot-bdn-sheet.png', 20),
+        ('mascot-bz', 'Brazil', 'BR', 'br', 'mascot-bz', '["#009b3a", "#ffdf00", "#002776"]'::jsonb, 25, 'ready', true, 'new', '#eab308', '#fff5f5', true, '/mascot/mascot-bz.png', '/mascot/mascot-bz-sheet.png', 30),
+        ('mascot-phap', 'Pháp', 'FR', 'fr', 'mascot-phap', '["#0055a4", "#ffffff", "#ef4135"]'::jsonb, 25, 'ready', true, 'new', '#2563eb', '#fff5f5', true, '/mascot/mascot-phap.png', '/mascot/mascot-phap-sheet.png', 40),
+        ('mascot-argen', 'Argentina', 'AR', 'ar', 'mascot-argen', '["#74acdf", "#ffffff", "#f6b40e"]'::jsonb, 25, 'ready', true, 'new', '#38bdf8', '#fff5f5', true, '/mascot/mascot-argen.png', '/mascot/mascot-argen-sheet.png', 50)
+      ON CONFLICT (id) DO NOTHING;
+
+      DROP TRIGGER IF EXISTS trg_trang_phuc_mascot_updated_at
+        ON trang_phuc_mascot;
+      CREATE TRIGGER trg_trang_phuc_mascot_updated_at
+      BEFORE UPDATE ON trang_phuc_mascot
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+    `,
+  },
 ]
 
 // ========== HÀM CHẠY MIGRATIONS ==========

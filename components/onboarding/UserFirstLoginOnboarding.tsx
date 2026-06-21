@@ -147,6 +147,14 @@ const ALL_TOUR_STEPS: TourStep[] = [
     mascotAction: 'jump',
   },
   {
+    id: 'mascot-outfit',
+    title: 'Thay đổi trang phục mascot',
+    description:
+      'Bấm vào bé Mai ở góc phải màn hình, sau đó chọn “Đổi trang phục” để mở tủ đồ World Cup và lưu outfit bạn thích.',
+    target: 'tour-mascot-widget',
+    mascotAction: 'jump',
+  },
+  {
     id: 'quanlyphanho',
     title: 'Trung tâm phản hồi',
     description:
@@ -169,6 +177,7 @@ export default function UserFirstLoginOnboarding() {
   const [tourEnabled, setTourEnabled] = useState(false)
   const [sessionDismissed, setSessionDismissed] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
+  const [tourScope, setTourScope] = useState<'full' | 'mascot-outfit'>('full')
   const [mascotPhase, setMascotPhase] = useState<
     'initial' | 'reading' | 'walking' | 'sitting' | 'standingUp' | 'walkingAgain' | 'readingFinal'
   >('initial')
@@ -218,12 +227,23 @@ export default function UserFirstLoginOnboarding() {
 
   useEffect(() => {
     const handleStartTour = () => {
+      setTourScope('full')
       setStepIndex(findStepIndexById('sidebar'))
       setTourEnabled(true)
       setSessionDismissed(false)
     }
+    const handleStartMascotOutfitTour = () => {
+      setTourScope('mascot-outfit')
+      setStepIndex(findStepIndexById('mascot-outfit'))
+      setTourEnabled(true)
+      setSessionDismissed(false)
+    }
     window.addEventListener('start-tour', handleStartTour)
-    return () => window.removeEventListener('start-tour', handleStartTour)
+    window.addEventListener('start-mascot-outfit-tour', handleStartMascotOutfitTour)
+    return () => {
+      window.removeEventListener('start-tour', handleStartTour)
+      window.removeEventListener('start-mascot-outfit-tour', handleStartMascotOutfitTour)
+    }
   }, [])
 
   useEffect(() => {
@@ -342,7 +362,7 @@ export default function UserFirstLoginOnboarding() {
   }
 
   const nextStep = async () => {
-    if (stepIndex >= TOUR_STEPS.length - 1) {
+    if (tourScope === 'mascot-outfit' || stepIndex >= TOUR_STEPS.length - 1) {
       await closeTour()
       return
     }
@@ -352,7 +372,7 @@ export default function UserFirstLoginOnboarding() {
   }
 
   const previousStep = () => {
-    if (stepIndex === 0) return
+    if (tourScope === 'mascot-outfit' || stepIndex === 0) return
     setStepIndex((prev) => prev - 1)
   }
 
@@ -587,13 +607,13 @@ export default function UserFirstLoginOnboarding() {
           {/* Bottom: step counter + buttons */}
           <div className="flex items-center justify-between gap-2 border-t border-gray-200 pt-3">
             <p className="text-xs font-medium text-gray-500">
-              Bước {stepIndex + 1}/{TOUR_STEPS.length}
+              Bước {tourScope === 'mascot-outfit' ? 1 : stepIndex + 1}/{tourScope === 'mascot-outfit' ? 1 : TOUR_STEPS.length}
             </p>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={previousStep}
-                disabled={stepIndex === 0}
+                disabled={tourScope === 'mascot-outfit' || stepIndex === 0}
                 className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
@@ -604,7 +624,7 @@ export default function UserFirstLoginOnboarding() {
                 onClick={nextStep}
                 className="inline-flex items-center gap-1 rounded-md bg-[#a1001f] px-3 py-2 text-xs font-semibold text-white hover:bg-[#8a001a]"
               >
-                {stepIndex >= TOUR_STEPS.length - 1 ? (
+                {tourScope === 'mascot-outfit' || stepIndex >= TOUR_STEPS.length - 1 ? (
                   <>
                     <Check className="h-3.5 w-3.5" />
                     Hoàn tất

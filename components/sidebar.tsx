@@ -288,6 +288,7 @@ export function Sidebar() {
       icon: Settings,
       submenu: [
         { href: '/admin/user-management', label: 'Quản lý tài khoản' },
+        { href: '/admin/quan-ly-be-mai', label: 'Quản lý bé Mai' },
         { href: '/admin/feedback', label: 'Feedback Manager' },
         {
           href: '/admin/feedback?source=datasource',

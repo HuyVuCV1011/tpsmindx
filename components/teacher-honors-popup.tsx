@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Crown, Star, Sparkles, Trophy } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, Crown, Eye, Save, Shirt, Star, Sparkles, Trophy } from 'lucide-react'
 import useSWR from 'swr'
 import { cn } from '@/lib/utils'
 
@@ -530,7 +530,105 @@ interface PopupUIProps {
   activeConfetti: boolean
 }
 
+function MascotFeaturePanel({ onExplore }: { onExplore: () => void }) {
+  return (
+    <div className="mx-auto flex min-h-[680px] max-w-[720px] flex-col justify-center py-2 sm:min-h-[700px] md:min-h-[690px]">
+      <div
+        className="relative overflow-hidden rounded-[1.5rem] border border-red-100 bg-white/95 p-4 text-slate-900 shadow-[0_24px_70px_rgba(127,29,29,0.24)] sm:p-6"
+        style={{
+          background: 'radial-gradient(circle at 12% 10%, rgba(254,226,226,0.98), transparent 34%), radial-gradient(circle at 88% 12%, rgba(220,252,231,0.92), transparent 30%), linear-gradient(135deg, #fffaf7 0%, #ffffff 46%, #fff1f2 100%)',
+        }}
+      >
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -right-8 -top-8 text-[7rem] font-black leading-none text-red-900/[0.04] sm:text-[9rem]">2026</div>
+          <div className="absolute bottom-3 left-4 text-[4rem] leading-none text-yellow-500/10 sm:text-[5rem]">🏆</div>
+          <div className="absolute inset-x-0 top-0 flex h-1.5">
+            <span className="flex-1 bg-[#006847]" />
+            <span className="flex-1 bg-white" />
+            <span className="flex-1 bg-[#ce1126]" />
+          </div>
+        </div>
+
+        <div className="relative z-10">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-red-700">
+            <Sparkles className="h-4 w-4" />
+            Tính năng mới
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-[1fr_210px] md:items-center">
+            <div>
+              <h2 className="text-2xl font-black leading-tight text-slate-950 sm:text-3xl">Thay đổi trang phục cho mascot bé Mai</h2>
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+                Bé Mai đã có tủ đồ World Cup: chọn outfit theo đội tuyển yêu thích, xem animation ngay trong modal và lưu để mascot ngoài màn hình dùng bộ trang phục mới.
+              </p>
+            </div>
+
+            <div className="relative mx-auto flex h-44 w-44 items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-yellow-300/30 blur-2xl" />
+              <div className="relative flex h-36 w-36 items-center justify-center rounded-full border border-yellow-200 bg-white shadow-[0_18px_45px_rgba(251,191,36,0.22)]">
+                <Trophy className="h-16 w-16 text-yellow-300 drop-shadow-[0_8px_22px_rgba(250,204,21,0.45)]" strokeWidth={2.2} />
+                <span className="absolute -bottom-2 rounded-full bg-red-600 px-3 py-1 text-[11px] font-black text-white shadow">WC 2026</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            {[
+              { icon: Shirt, title: 'Chọn áo đội tuyển', body: 'Bấm vào bé Mai ở góc phải để mở tủ đồ và chọn bộ theo quốc gia bạn thích.', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
+              { icon: Eye, title: 'Xem preview trước', body: 'Animation chạy ngay trong modal để bạn biết bộ nào hợp nhất trước khi lưu.', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+              { icon: Save, title: 'Lưu và dùng ngay', body: 'Sau khi lưu, mascot ngoài màn hình tự đổi sang outfit mới.', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+            ].map(({ icon: Icon, title, body, color, bg, border }) => (
+              <div key={title} className={`rounded-2xl border ${border} ${bg} p-3 shadow-sm`}>
+                <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white ${color} shadow-sm`}>
+                  <Icon className="h-5 w-5" strokeWidth={2.4} />
+                </div>
+                <p className="text-sm font-black text-slate-900">{title}</p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">{body}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 flex justify-center">
+            <button
+              type="button"
+              onClick={onExplore}
+              className="inline-flex items-center gap-2 rounded-full bg-red-600 px-6 py-3 text-sm font-black uppercase tracking-[0.16em] text-white shadow-[0_14px_34px_rgba(220,38,38,0.28)] transition hover:-translate-y-0.5 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+            >
+              <Sparkles className="h-4 w-4" />
+              Khám phá
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfetti }: PopupUIProps) {
+  const [activePanel, setActivePanel] = useState<'honors' | 'feature'>('honors')
+
+  useEffect(() => {
+    if (!showCard || contentPhase < 3) {
+      setActivePanel('honors')
+      return
+    }
+    const timer = window.setInterval(() => {
+      setActivePanel(panel => panel === 'honors' ? 'feature' : 'honors')
+    }, 5000)
+    return () => window.clearInterval(timer)
+  }, [showCard, contentPhase])
+
+  const handleExploreMascotOutfits = useCallback(() => {
+    onClose()
+    window.setTimeout(() => {
+      window.dispatchEvent(new Event('start-mascot-outfit-tour'))
+    }, 260)
+  }, [onClose])
+
+  const togglePanel = useCallback(() => {
+    setActivePanel(panel => panel === 'honors' ? 'feature' : 'honors')
+  }, [])
+
   return (
     <div className="fixed inset-0 z-[58] flex items-center justify-center p-2 sm:p-4 pointer-events-none select-none">
       <style>{`
@@ -661,7 +759,37 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
          <button onClick={onClose} className="absolute top-2.5 right-2.5 sm:top-4 sm:right-4 z-30 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center group transition-all duration-200 hover:scale-110" style={{ background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.4)', backdropFilter: 'blur(8px)' }} aria-label="Đóng">
            <X className="w-4 h-4 text-white/80 group-hover:text-white group-hover:rotate-90 transition-all duration-300" />
          </button>
-         <div className="relative z-10 px-3 sm:px-5 md:px-8 pt-5 sm:pt-7 pb-5 sm:pb-7">
+         <div className="absolute inset-y-0 left-0 right-0 z-30 pointer-events-none flex items-center justify-between px-2 sm:px-4">
+           <button
+             type="button"
+             onClick={togglePanel}
+             className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-white/45 bg-black/25 text-white shadow-lg backdrop-blur-md transition hover:scale-110 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 sm:h-10 sm:w-10"
+             aria-label="Quay lại popup trước"
+           >
+             <ChevronLeft className="h-5 w-5" strokeWidth={2.6} />
+           </button>
+           <button
+             type="button"
+             onClick={togglePanel}
+             className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-white/45 bg-black/25 text-white shadow-lg backdrop-blur-md transition hover:scale-110 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 sm:h-10 sm:w-10"
+             aria-label="Đi tới popup tiếp theo"
+           >
+             <ChevronRight className="h-5 w-5" strokeWidth={2.6} />
+           </button>
+         </div>
+         <div className="absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/25 bg-black/20 px-3 py-1.5 backdrop-blur-md">
+           {(['honors', 'feature'] as const).map(panel => (
+             <button
+               key={panel}
+               type="button"
+               onClick={() => setActivePanel(panel)}
+               className={cn('h-2.5 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70', activePanel === panel ? 'w-6 bg-white' : 'w-2.5 bg-white/45 hover:bg-white/70')}
+               aria-label={panel === 'honors' ? 'Mở popup vinh danh' : 'Mở popup tính năng mới'}
+             />
+           ))}
+         </div>
+         <div className="relative z-10 min-h-[720px] px-3 pb-5 pt-5 sm:min-h-[760px] sm:px-5 sm:pb-7 sm:pt-7 md:min-h-[740px] md:px-8">
+           <div className={cn('absolute inset-x-3 top-5 transition-all duration-700 sm:inset-x-5 sm:top-7 md:inset-x-8', activePanel === 'honors' ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-3')}>
            <div className={cn('text-center mb-4 sm:mb-7', contentPhase >= 1 ? 'anim-title-reveal' : 'opacity-0')}>
              <div className="inline-flex max-w-[calc(100%-3rem)] items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2 rounded-full mb-3 sm:mb-4 relative"
                style={{
@@ -685,7 +813,7 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
              <h1 className="text-[1.55rem] sm:text-[2rem] md:text-[2.4rem] font-black tracking-tight leading-none mb-2 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.3)]">VINH DANH NGÔI SAO ĐÀO TẠO</h1>
              <p className="text-[12px] sm:text-[15px] text-white/90 font-extrabold tracking-wide sm:tracking-widest drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]">TẬN TÂM TRÊN TỪNG BÀI GIẢNG &nbsp;·&nbsp; TRUYỀN CẢM HỨNG MỖI NGÀY</p>
            </div>
-          <div className={cn('flex items-end justify-center gap-1.5 sm:gap-3 md:gap-6 mt-6 sm:mt-8 md:mt-[40px] mb-6 sm:mb-7 md:mb-[30px] w-full px-0 sm:px-2', contentPhase >= 2 ? '' : 'opacity-0')}>
+          <div className={cn('flex items-end justify-center gap-1.5 sm:gap-3 md:gap-6 mt-6 sm:mt-8 md:mt-[40px] mb-4 sm:mb-5 md:mb-5 w-full px-0 sm:px-2', contentPhase >= 2 ? '' : 'opacity-0')}>
             {podium.map((teacher, idx) => {
               const isFirst = idx === 1
               const animCls = contentPhase >= 2 ? (isFirst ? 'anim-slide-center' : idx === 0 ? 'anim-slide-left' : 'anim-slide-right') : 'opacity-0'
@@ -715,6 +843,110 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
                </div>
              </div>
            </div>
+           </div>
+           <div className={cn('absolute inset-x-3 top-5 transition-all duration-700 sm:inset-x-5 sm:top-7 md:inset-x-8', activePanel === 'feature' ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 translate-y-3')}>
+             <MascotFeaturePanel onExplore={handleExploreMascotOutfits} />
+           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MascotOutfitFeatureModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-900/35 backdrop-blur-md"
+        aria-label="Đóng giới thiệu tính năng thay đổi trang phục"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Giới thiệu tính năng thay đổi trang phục mascot"
+        className="relative w-full max-w-[640px] overflow-hidden rounded-[1.6rem] border border-red-100 text-slate-900 shadow-[0_32px_90px_rgba(15,23,42,0.28)]"
+        style={{
+          background: 'radial-gradient(circle at 15% 10%, rgba(254,226,226,0.95), transparent 32%), radial-gradient(circle at 86% 14%, rgba(220,252,231,0.9), transparent 28%), linear-gradient(135deg, #fffaf7 0%, #ffffff 46%, #fff1f2 100%)',
+        }}
+      >
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -right-10 -top-10 text-[9rem] font-black leading-none text-red-900/[0.04]">2026</div>
+          <div className="absolute bottom-4 left-5 text-[5rem] leading-none text-yellow-500/10">🏆</div>
+          <div className="absolute inset-x-0 top-0 flex h-1.5">
+            <span className="flex-1 bg-[#006847]" />
+            <span className="flex-1 bg-white" />
+            <span className="flex-1 bg-[#ce1126]" />
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white/80 text-slate-500 shadow-sm transition hover:bg-white hover:text-slate-900"
+          aria-label="Đóng"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        <div className="relative z-10 p-5 sm:p-7">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-red-700">
+            <Sparkles className="h-4 w-4" />
+            Tính năng mới
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-[1fr_190px] sm:items-center">
+            <div>
+              <h2 className="text-2xl font-black leading-tight text-slate-950 sm:text-3xl">Thay đổi trang phục cho mascot bé Mai</h2>
+              <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+                Bé Mai đã có tủ đồ World Cup: chọn outfit theo đội tuyển yêu thích, xem animation trong modal và lưu để mascot ngoài màn hình dùng ngay bộ trang phục mới.
+              </p>
+            </div>
+
+            <div className="relative mx-auto flex h-44 w-44 items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-yellow-300/30 blur-2xl" />
+              <div className="relative flex h-36 w-36 items-center justify-center rounded-full border border-yellow-200 bg-white shadow-[0_18px_45px_rgba(251,191,36,0.22)]">
+                <Trophy className="h-16 w-16 text-yellow-300 drop-shadow-[0_8px_22px_rgba(250,204,21,0.45)]" strokeWidth={2.2} />
+                <span className="absolute -bottom-2 rounded-full bg-red-600 px-3 py-1 text-[11px] font-black text-white shadow">WC 2026</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            {[
+              { icon: Shirt, title: 'Chọn áo đội tuyển', body: 'Mở tủ đồ bằng cách bấm vào bé Mai ở góc phải và chọn bộ theo quốc gia bạn thích.', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
+              { icon: Eye, title: 'Xem preview trước', body: 'Animation chạy ngay trong modal để bạn biết bộ nào hợp nhất.', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+              { icon: Save, title: 'Lưu và dùng ngay', body: 'Sau khi lưu, mascot ngoài màn hình tự đổi sang outfit mới.', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+            ].map(({ icon: Icon, title, body, color, bg, border }) => (
+              <div key={title} className={`rounded-2xl border ${border} ${bg} p-3 shadow-sm`}>
+                <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white ${color} shadow-sm`}>
+                  <Icon className="h-5 w-5" strokeWidth={2.4} />
+                </div>
+                <p className="text-sm font-black text-slate-900">{title}</p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">{body}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
+            >
+              Để tôi khám phá sau
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center justify-center rounded-xl bg-red-600 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-red-600/20 transition hover:bg-red-700"
+            >
+              Đã hiểu
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -837,7 +1069,16 @@ export function TeacherHonorsPopup({ isOpen, onOpen, onClose }: TeacherHonorsPop
     <>
       <canvas ref={canvasRef} className="fixed inset-0 z-[60] pointer-events-none" style={{ opacity: 0, transition: 'opacity 0.15s' }} aria-hidden />
       {renderCard && <div ref={overlayRef} className="fixed inset-0 z-[55] bg-black/40 backdrop-blur-sm" style={{ opacity: 0 }} onClick={triggerClose} />}
-      {renderCard && <PopupUI cardRef={cardRef} showCard={showCard} contentPhase={contentPhase} podium={podium} onClose={triggerClose} activeConfetti={showCard && contentPhase >= 3} />}
+      {renderCard && (
+        <PopupUI
+          cardRef={cardRef}
+          showCard={showCard}
+          contentPhase={contentPhase}
+          podium={podium}
+          onClose={triggerClose}
+          activeConfetti={showCard && contentPhase >= 3}
+        />
+      )}
     </>,
     document.body
   )

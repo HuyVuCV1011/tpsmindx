@@ -9,12 +9,21 @@ import {
   ChevronRight,
   Map,
   MessageCircleMore,
+  Shirt,
   UploadCloud,
   X,
 } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import {
+  getMascotOutfitId,
+  getOutfitFrames,
+  isStaticOutfit,
+  MASCOT_OUTFITS,
+  MascotOutfit,
+  MascotOutfitModal,
+} from '@/components/mascot/MascotOutfitModal'
 
 // ─── Mascot constants ────────────────────────────────────────────────────────
 const WALK_FRAMES = Array.from({ length: 25 }, (_, i) => `/mascot/walk/frame-${i + 1}.png`)
@@ -27,6 +36,7 @@ const WALK_FPS = 20            // sprite animation fps for walk
 const JUMP_FPS = 20            // sprite animation fps for jump
 const TURN_FPS = 18            // sprite animation fps for turn
 const WAVE_FPS = 15            // sprite animation fps for wave (slower = friendlier)
+const STATIC_OUTFIT_FPS = 7    // slower loop for outfit previews/new costumes
 const JUMP_COOLDOWN_MIN = 2000
 const JUMP_COOLDOWN_MAX = 8000
 // ─────────────────────────────────────────────────────────────────────────────
@@ -55,8 +65,31 @@ const getFallbackPageTitle = (path: string) => {
     .join(' ')
 }
 // ─── Mascot walking component ────────────────────────────────────────────────
-function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: () => void }) {
+function MascotWalker({
+  onFeedback,
+  onTour,
+  onOutfit,
+  outfitId,
+  outfits,
+}: {
+  onFeedback: () => void
+  onTour: () => void
+  onOutfit: () => void
+  outfitId: string
+  outfits: MascotOutfit[]
+}) {
   const [hovered, setHovered] = useState(false)
+
+  // Active frames theo outfit — dùng ref để RAF loop luôn đọc giá trị mới nhất
+  // walk: frames chính khi di chuyển
+  // jump: frames khi nhảy (random cooldown)
+  // wave: frames khi hover
+  const activeWalkFramesRef = useRef<string[]>(WALK_FRAMES)
+  const activeJumpFramesRef = useRef<string[]>(JUMP_FRAMES)
+  const activeWaveFramesRef = useRef<string[]>(WAVE_FRAMES)
+  // staticMode: true → mascot đứng yên tại chỗ, loop activeWalkFrames; false → walk/turn/jump bình thường
+  const activeModeRef = useRef<'default' | 'static'>('default')
+  const activeOutfitFpsRef = useRef(WALK_FPS)
 
   // Refs for direct DOM manipulation to bypass React renders
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -124,6 +157,79 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
     }
   }, [])
 
+  // Cập nhật tất cả frames khi outfitId thay đổi — dùng string ID để tránh object reference trap
+  useEffect(() => {
+    const outfit = outfits.find((o) => o.id === outfitId && o.available) ?? outfits[0] ?? MASCOT_OUTFITS[0]
+
+    // Walk frames — đặc trưng của outfit
+    const newWalkFrames = getOutfitFrames(outfit, 'walk') ?? WALK_FRAMES
+    // Jump frames — chỉ dùng trong default mode
+    const newJumpFrames = getOutfitFrames(outfit, 'jump') ?? JUMP_FRAMES
+    // Wave frames — dùng khi hover
+    const newWaveFrames = getOutfitFrames(outfit, 'wave') ?? WAVE_FRAMES
+
+    activeWalkFramesRef.current = newWalkFrames
+    activeJumpFramesRef.current = newJumpFrames
+    activeWaveFramesRef.current = newWaveFrames
+
+    const isStatic = isStaticOutfit(outfit)
+    activeModeRef.current = isStatic ? 'static' : 'default'
+    activeOutfitFpsRef.current = isStatic ? STATIC_OUTFIT_FPS : WALK_FPS
+
+    // Khi chuyển sang static mode: dừng di chuyển, reset về phase 'walk' (loop frames tại chỗ)
+    // Khi chuyển về default mode: reset về phase 'walk', bắt đầu di chuyển lại
+    const st = s.current
+    st.phase = 'walk'
+    st.turnCount = 0
+    st.pausedPhase = null
+    st.posX = 0
+    st.pausedPosX = 0
+    st.dirRight = false
+    if (wrapperRef.current) {
+      wrapperRef.current.style.transform = 'translateX(0px)'
+    }
+
+    // Reset frameIdx ngay
+    st.frameIdx = 0
+    st.lastFrameTime = 0
+
+    // Helper: draw frame 0 lên canvas
+    const drawFirstFrame = (img: HTMLImageElement) => {
+      if (!canvasRef.current) return
+      const ctx = canvasRef.current.getContext('2d')
+      if (!ctx) return
+      ctx.clearRect(0, 0, 200, 200)
+      ctx.save()
+      if (!s.current.dirRight) {
+        ctx.scale(-1, 1)
+        ctx.drawImage(img, -200, 0, 200, 200)
+      } else {
+        ctx.drawImage(img, 0, 0, 200, 200)
+      }
+      ctx.restore()
+    }
+
+    newWalkFrames.forEach((src, idx) => {
+      const existing = imagesRef.current.get(src)
+      if (existing) {
+        if (idx === 0 && existing.complete && existing.naturalWidth > 0) drawFirstFrame(existing)
+        return
+      }
+      const img = new window.Image()
+      img.onload = () => { if (idx === 0) drawFirstFrame(img) }
+      img.src = src
+      imagesRef.current.set(src, img)
+    })
+    // Preload jump + wave frames của outfit mới
+    ;[...newJumpFrames, ...newWaveFrames].forEach((src) => {
+      if (!imagesRef.current.has(src)) {
+        const img = new window.Image()
+        img.src = src
+        imagesRef.current.set(src, img)
+      }
+    })
+  }, [outfitId, outfits])
+
   // Preload frames incrementally to avoid freezing main thread
   useEffect(() => {
     const allFrames = [...WALK_FRAMES, ...JUMP_FRAMES, ...TURN_FRAMES, ...WAVE_FRAMES]
@@ -172,11 +278,16 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
   useEffect(() => {
     const st = s.current
 
-    // Schedule first jump
+    // Schedule first jump — chỉ trong default mode
     const scheduleJump = () => {
       const delay = JUMP_COOLDOWN_MIN + Math.random() * (JUMP_COOLDOWN_MAX - JUMP_COOLDOWN_MIN)
       st.jumpTimer = window.setTimeout(() => {
-        if (!st.isHidden && st.phase === 'walk') {  // only jump when walking, never during wave/turn/jump
+        // Guard kép: chỉ jump khi default mode + đang walk + không ẩn
+        const canJump =
+          !st.isHidden &&
+          activeModeRef.current === 'default' &&
+          st.phase === 'walk'
+        if (canJump) {
           st.phase = 'jump'
           st.frameIdx = 0
           st.lastFrameTime = performance.now()
@@ -195,17 +306,29 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
 
       if (st.lastFrameTime === 0) st.lastFrameTime = now
 
+      const isStatic = activeModeRef.current === 'static'
+
+      // ── Static mode guard: nếu phase là jump/turn do timer fire muộn, reset ngay ──
+      if (isStatic && st.phase !== 'wave' && st.phase !== 'walk') {
+        st.phase = 'walk'
+        st.frameIdx = 0
+        st.lastFrameTime = now
+      }
+
       const frames =
-        st.phase === 'wave' ? WAVE_FRAMES :
-          st.phase === 'jump' ? JUMP_FRAMES :
-            st.phase === 'turn' ? TURN_FRAMES :
-              WALK_FRAMES
+        st.phase === 'wave' ? activeWaveFramesRef.current :
+          isStatic
+            ? activeWalkFramesRef.current  // static mode: chỉ loop walk frames tại chỗ
+            : st.phase === 'jump' ? activeJumpFramesRef.current :
+              st.phase === 'turn' ? TURN_FRAMES :
+                activeWalkFramesRef.current
 
       const fps =
-        st.phase === 'wave' ? WAVE_FPS :
-          st.phase === 'jump' ? JUMP_FPS :
-            st.phase === 'turn' ? TURN_FPS :
-              WALK_FPS
+        isStatic ? activeOutfitFpsRef.current :
+          st.phase === 'wave' ? WAVE_FPS :
+            st.phase === 'jump' ? JUMP_FPS :
+              st.phase === 'turn' ? TURN_FPS :
+                activeOutfitFpsRef.current
 
       const msPerFrame = 1000 / fps
 
@@ -217,14 +340,14 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
         st.frameIdx++
         frameChanged = true
 
-        if (st.phase === 'wave' && st.frameIdx >= WAVE_FRAMES.length) {
+        if (st.phase === 'wave' && st.frameIdx >= activeWaveFramesRef.current.length) {
           // Wave loops continuously while hovered
           st.frameIdx = 0
-        } else if (st.phase === 'jump' && st.frameIdx >= JUMP_FRAMES.length) {
+        } else if (!isStatic && st.phase === 'jump' && st.frameIdx >= activeJumpFramesRef.current.length) {
           // Jump done → back to walk
           st.phase = 'walk'
           st.frameIdx = 0
-        } else if (st.phase === 'turn' && st.frameIdx >= TURN_FRAMES.length) {
+        } else if (!isStatic && st.phase === 'turn' && st.frameIdx >= TURN_FRAMES.length) {
           // Turn done → flip direction, walk
           st.turnCount = 0
           st.dirRight = !st.dirRight
@@ -237,8 +360,8 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
 
       let positionChanged = false
 
-      // ── Move position (walk + jump both move, wave/turn freeze) ──────────────
-      if (st.phase !== 'turn' && st.phase !== 'wave') {
+      // ── Move position — chỉ trong default mode (walk + jump di chuyển, static đứng yên) ──
+      if (!isStatic && st.phase !== 'turn' && st.phase !== 'wave') {
         if (st.lastPosTime === 0) st.lastPosTime = now
         const dt = Math.min(now - st.lastPosTime, 50) // cap at 50ms to avoid jumps after tab switch
         st.lastPosTime = now
@@ -267,7 +390,7 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
         }
         positionChanged = true
       } else {
-        st.lastPosTime = now // keep lastPosTime fresh during turn so no dt spike after
+        st.lastPosTime = now // keep lastPosTime fresh during turn/wave/static so no dt spike after
       }
 
       // ── Push directly to DOM (Bypass React Render) ─────────────────────────
@@ -277,10 +400,12 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
 
       if (frameChanged && canvasRef.current) {
         const currentFrames =
-          st.phase === 'wave' ? WAVE_FRAMES :
-            st.phase === 'jump' ? JUMP_FRAMES :
-              st.phase === 'turn' ? TURN_FRAMES :
-                WALK_FRAMES
+          st.phase === 'wave' ? activeWaveFramesRef.current :
+            (activeModeRef.current === 'static')
+              ? activeWalkFramesRef.current
+              : st.phase === 'jump' ? activeJumpFramesRef.current :
+                st.phase === 'turn' ? TURN_FRAMES :
+                  activeWalkFramesRef.current
         const src = currentFrames[st.frameIdx] ?? currentFrames[0]
         const scaleX = st.dirRight ? 1 : -1
 
@@ -312,6 +437,7 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
   return (
     <div
       ref={wrapperRef}
+      data-tour="tour-mascot-widget"
       className="pointer-events-none fixed z-mascot h-[160px] w-[160px]"
       style={{
         bottom: 'calc(env(safe-area-inset-bottom, 0px) + 0px)',
@@ -339,6 +465,13 @@ function MascotWalker({ onFeedback, onTour }: { onFeedback: () => void; onTour: 
           >
             <Map className="w-4 h-4 shrink-0" />
             Xem hướng dẫn
+          </button>
+          <button
+            onClick={() => { closeMascotMenu(); onOutfit() }}
+            className="flex items-center justify-center gap-2 border-2 border-purple-400 rounded-xl px-4 py-2.5 text-[13px] font-semibold text-purple-600 bg-white hover:bg-purple-50 shadow-md transition-all duration-200 hover:-translate-y-0.5 active:scale-95 whitespace-nowrap"
+          >
+            <Shirt className="w-4 h-4 shrink-0" />
+            Đổi trang phục
           </button>
           <button
             onClick={onFeedback}
@@ -390,6 +523,9 @@ export default function UserFeedbackWidget() {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [open, setOpen] = useState(false)
+  const [outfitModalOpen, setOutfitModalOpen] = useState(false)
+  const [currentOutfitId, setCurrentOutfitId] = useState<string>('default')
+  const [mascotOutfits, setMascotOutfits] = useState<MascotOutfit[]>(MASCOT_OUTFITS)
   const [content, setContent] = useState('')
   const [suggestion, setSuggestion] = useState('')
   const [selectedScreenPath, setSelectedScreenPath] = useState(pathname)
@@ -407,6 +543,33 @@ export default function UserFeedbackWidget() {
 
   useEffect(() => {
     setMounted(true)
+    if (user?.email) {
+      setCurrentOutfitId(getMascotOutfitId(user.email))
+    }
+  }, [user?.email])
+
+  useEffect(() => {
+    let cancelled = false
+    const loadOutfits = async () => {
+      try {
+        const response = await fetch('/api/mascot-outfits', { cache: 'no-store' })
+        const data = await response.json()
+        if (!cancelled && response.ok && data.success && Array.isArray(data.data) && data.data.length > 0) {
+          const next = [MASCOT_OUTFITS[0], ...data.data.filter((item: MascotOutfit) => item.id !== 'default')]
+          setMascotOutfits(next)
+          setCurrentOutfitId((current) => next.some((item) => item.id === current && item.available) ? current : 'default')
+        }
+      } catch {
+        if (!cancelled) setMascotOutfits(MASCOT_OUTFITS)
+      }
+    }
+    loadOutfits()
+    const onRefresh = () => loadOutfits()
+    window.addEventListener('mascot-outfits-refresh', onRefresh)
+    return () => {
+      cancelled = true
+      window.removeEventListener('mascot-outfits-refresh', onRefresh)
+    }
   }, [])
 
   useEffect(() => {
@@ -516,8 +679,21 @@ export default function UserFeedbackWidget() {
       {/* Mascot walker replaces old button */}
       <MascotWalker
         onFeedback={() => setOpen(true)}
-        onTour={() => {
-          window.dispatchEvent(new Event('start-tour'))
+        onTour={() => { window.dispatchEvent(new Event('start-tour')) }}
+        onOutfit={() => setOutfitModalOpen(true)}
+        outfitId={currentOutfitId}
+        outfits={mascotOutfits}
+      />
+
+      {/* Outfit selection modal */}
+      <MascotOutfitModal
+        isOpen={outfitModalOpen}
+        onClose={() => setOutfitModalOpen(false)}
+        userEmail={user?.email ?? ''}
+        currentOutfitId={currentOutfitId}
+        outfits={mascotOutfits}
+        onOutfitChange={(outfit) => {
+          setCurrentOutfitId(outfit.id)
         }}
       />
 
@@ -651,7 +827,6 @@ export default function UserFeedbackWidget() {
                         key={file.name + file.size + idx}
                         className="relative w-24 h-24 shrink-0 rounded-lg overflow-hidden border border-gray-200 bg-gray-100"
                       >
-                        { }
                         <img
                           src={URL.createObjectURL(file)}
                           alt={file.name}
@@ -711,7 +886,6 @@ export default function UserFeedbackWidget() {
               <X className="h-6 w-6" />
             </button>
             <div className="bg-black rounded-xl overflow-hidden border border-white/20">
-              { }
               <img
                 src={previewImages[previewIndex]}
                 alt={`feedback-${previewIndex + 1}`}

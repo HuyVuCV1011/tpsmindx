@@ -1518,15 +1518,6 @@ export default function Page1() {
       TIME_SLOTS,
     }
 
-    // Debug logging
-    if (periodData.length === 0) {
-      console.warn('⚠️ No availability data:', {
-        period: availabilityPeriod,
-        totalRecords: availabilityRecords.length,
-        dateRange: { from: availabilityFromDate, to: availabilityToDate },
-      })
-    }
-
     return stats
   }, [
     availabilityRecords,
