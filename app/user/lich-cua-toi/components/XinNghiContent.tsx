@@ -385,11 +385,6 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
     const todayVN = new Date(vnStr)
     todayVN.setHours(0, 0, 0, 0)
 
-    // Debug: xem format của slot đầu tiên
-    const sample = lmsSlots[0]
-    console.log('[XinNghi] sample slot:', JSON.stringify({ date: sample?.date, className: sample?.className, startTime: sample?.startTime, status: sample?.status }))
-    console.log('[XinNghi] todayVN (midnight):', todayVN.toISOString(), 'from now:', now.toISOString())
-
     const map = new Map<string, { classId: string; className: string; centreName: string; studentCount: number }>()
     let processedCount = 0
     let runningCount = 0
@@ -526,15 +521,6 @@ export default function XinNghiContent({ initialLeaveDate, externalOpen, onCreat
           sessionNumber,
         })
       }
-    }
-
-    // Debug
-    if (result.length > 0) {
-      console.log('[XinNghi] selectedClassFutureSlots sample:', result.slice(0, 5).map(s => ({
-        date: s.date,
-        sessionNumber: s.sessionNumber,
-        startTime: s.startTime,
-      })))
     }
 
     return result

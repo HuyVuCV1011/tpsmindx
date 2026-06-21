@@ -405,7 +405,6 @@ export async function POST(request: NextRequest) {
     const isAdmin = Boolean(auth.resolvedAccess.isAdmin);
 
     const body = await request.json();
-    console.log('[exam-registrations POST] Request body:', JSON.stringify(body, null, 2));
 
     const targetEmail = String(body?.dia_chi_email || body?.email || '').trim();
     const teacherCode = String(body?.ma_giao_vien || body?.teacher_code || '').trim();
@@ -434,7 +433,6 @@ export async function POST(request: NextRequest) {
 
     const result = await insertExamRegistration(pool, registrationBody);
     if (!result.ok) {
-      console.error('[exam-registrations POST] Insert failed:', result.error);
       return NextResponse.json(
         {
           success: false,
@@ -444,7 +442,6 @@ export async function POST(request: NextRequest) {
         { status: result.httpStatus }
       );
     }
-    console.log('[exam-registrations POST] Success:', result.data);
     return NextResponse.json(
       { success: true, data: result.data, message: 'Đăng ký thi thành công' },
       { status: 201 }

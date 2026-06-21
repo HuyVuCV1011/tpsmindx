@@ -598,6 +598,7 @@ export function DockNav() {
       id: 'hethong', label: 'Hệ thống', icon: BarChart3,
       submenu: [
         { href: '/admin/user-management', label: 'Quản lý tài khoản' },
+        { href: '/admin/quan-ly-be-mai', label: 'Quản lý bé Mai' },
         { href: '/admin/database', label: 'Database Manager' },
         { href: '/admin/cloudinary', label: 'Cloudinary Manager' },
         { href: '/admin/email-monitor', label: 'Giám sát Email' },
@@ -671,6 +672,7 @@ export function DockNav() {
     { href: '/admin/quan-ly-tai-lieu-giang-day', label: 'Quản lý giáo trình' },
     // Hệ thống
     { href: '/admin/user-management', label: 'Quản lý tài khoản' },
+    { href: '/admin/quan-ly-be-mai', label: 'Quản lý bé Mai' },
     { href: '/admin/database', label: 'Database Manager' },
     { href: '/admin/cloudinary', label: 'Cloudinary Manager' },
     { href: '/admin/s3-supabase-manager', label: 'S3 Supabase Manager' },

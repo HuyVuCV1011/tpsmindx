@@ -75,7 +75,6 @@ export async function GET(request: NextRequest) {
   }
 
   const userEmail = session.email.toLowerCase().trim();
-  console.log('[lich-lop-hoc] User email:', userEmail);
 
   const firebaseToken = request.cookies.get('lms_firebase_token')?.value || '';
 
@@ -151,7 +150,7 @@ export async function GET(request: NextRequest) {
         });
 
         if (!hasLecRole) {
-          console.log(`[lich-lop-hoc] Skipping class ${cls.name} - user is not LEC`);
+          // skip non-LEC classes
         }
 
         return hasLecRole;
