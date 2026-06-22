@@ -599,9 +599,12 @@ interface PopupUIProps {
   activeConfetti: boolean
 }
 
+type PopupPanel = 'honors' | 'feature'
+const POPUP_PANELS: PopupPanel[] = ['honors', 'feature']
+
 function MascotFeaturePanel({ onExplore }: { onExplore: () => void }) {
   return (
-    <div className="mx-auto flex min-h-[680px] max-w-[720px] flex-col justify-center py-2 sm:min-h-[700px] md:min-h-[690px]">
+    <div className="mascot-feature-panel mx-auto flex max-w-[720px] flex-col justify-center py-2">
       <div
         className="relative overflow-hidden rounded-[1.5rem] border border-red-100 bg-white/95 p-4 text-slate-900 shadow-[0_24px_70px_rgba(127,29,29,0.24)] sm:p-6"
         style={{
@@ -674,18 +677,22 @@ function MascotFeaturePanel({ onExplore }: { onExplore: () => void }) {
 }
 
 function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfetti }: PopupUIProps) {
-  const [activePanel, setActivePanel] = useState<'honors' | 'feature'>('honors')
+  const [activePanel, setActivePanel] = useState<PopupPanel>('honors')
+  const [panelDirection, setPanelDirection] = useState<'next' | 'prev'>('next')
 
   useEffect(() => {
     if (!showCard || contentPhase < 3) {
+      setPanelDirection('prev')
       setActivePanel('honors')
       return
     }
     const timer = window.setInterval(() => {
-      setActivePanel(panel => panel === 'honors' ? 'feature' : 'honors')
+      const nextPanel = activePanel === 'honors' ? 'feature' : 'honors'
+      setPanelDirection(nextPanel === 'feature' ? 'next' : 'prev')
+      setActivePanel(nextPanel)
     }, 5000)
     return () => window.clearInterval(timer)
-  }, [showCard, contentPhase])
+  }, [showCard, contentPhase, activePanel])
 
   const handleExploreMascotOutfits = useCallback(() => {
     onClose()
@@ -694,9 +701,15 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
     }, 260)
   }, [onClose])
 
+  const switchPanel = useCallback((panel: PopupPanel) => {
+    if (activePanel === panel) return
+    setPanelDirection(POPUP_PANELS.indexOf(panel) > POPUP_PANELS.indexOf(activePanel) ? 'next' : 'prev')
+    setActivePanel(panel)
+  }, [activePanel])
+
   const togglePanel = useCallback(() => {
-    setActivePanel(panel => panel === 'honors' ? 'feature' : 'honors')
-  }, [])
+    switchPanel(activePanel === 'honors' ? 'feature' : 'honors')
+  }, [activePanel, switchPanel])
 
   return (
     <div className="fixed inset-0 z-[58] flex items-center justify-center p-2 sm:p-4 pointer-events-none select-none">
@@ -733,56 +746,338 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
         @keyframes ripple-out { 0% { transform: translate(-50%,-50%) scale(0.3); opacity: 0.7; } 100% { transform: translate(-50%,-50%) scale(2.8); opacity: 0; } }
         @keyframes ripple-out-2 { 0% { transform: translate(-50%,-50%) scale(0.5); opacity: 0.5; } 100% { transform: translate(-50%,-50%) scale(3.2); opacity: 0; } }
         @keyframes pulse-soft { 0%, 100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 0.55; transform: scale(1.12); } }
+        @keyframes honors-panel-fade-in {
+          0% {
+            opacity: 0;
+            transform: translate3d(var(--panel-enter-x, 0.7rem), 0.5rem, 0) scale(0.992);
+            filter: blur(10px) saturate(0.92);
+          }
+          48% {
+            opacity: 0.88;
+            filter: blur(2.4px) saturate(1.02);
+          }
+          100% {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+            filter: blur(0) saturate(1);
+          }
+        }
+        @keyframes honors-panel-fade-out {
+          0% {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+            filter: blur(0) saturate(1);
+          }
+          100% {
+            opacity: 0;
+            transform: translate3d(var(--panel-exit-x, -0.65rem), -0.25rem, 0) scale(0.992);
+            filter: blur(8px) saturate(0.9);
+          }
+        }
         .anim-slide-left { animation: card-slide-left 0.6s cubic-bezier(0.34,1.25,0.64,1) 0.4s both; }
         .anim-slide-center { animation: card-slide-center 0.7s cubic-bezier(0.34,1.35,0.64,1) 0.3s both; }
         .anim-slide-right { animation: card-slide-right 0.6s cubic-bezier(0.34,1.25,0.64,1) 0.4s both; }
         .anim-title-reveal { animation: title-reveal 0.55s cubic-bezier(0.34,1.2,0.64,1) 0.1s both; }
 
+        .honors-popup-card {
+          width: min(980px, calc(100vw - 1rem));
+          height: min(720px, calc(100dvh - 1rem));
+          max-height: calc(100dvh - 1rem);
+          scrollbar-gutter: stable both-edges;
+        }
+        .honors-stage {
+          --panel-enter-x: 0.7rem;
+          --panel-exit-x: -0.65rem;
+          height: 100%;
+          min-height: 0;
+          padding-bottom: clamp(3.75rem, 7dvh, 5rem);
+        }
+        .honors-stage.is-moving-next {
+          --panel-enter-x: 0.72rem;
+          --panel-exit-x: -0.62rem;
+        }
+        .honors-stage.is-moving-prev {
+          --panel-enter-x: -0.72rem;
+          --panel-exit-x: 0.62rem;
+        }
+        .honors-panel {
+          display: flex;
+          min-height: calc(100% - 1.25rem);
+          flex-direction: column;
+        }
+        .honors-swap-panel {
+          opacity: 0;
+          pointer-events: none;
+          transform: translate3d(var(--panel-exit-x), -0.25rem, 0) scale(0.992);
+          transform-origin: 50% 52%;
+          filter: blur(8px) saturate(0.9);
+          transition:
+            opacity 900ms cubic-bezier(0.22, 1, 0.36, 1),
+            transform 980ms cubic-bezier(0.16, 1, 0.3, 1),
+            filter 880ms cubic-bezier(0.22, 1, 0.36, 1);
+          will-change: opacity, transform, filter;
+          backface-visibility: hidden;
+        }
+        .honors-swap-panel.is-active {
+          z-index: 2;
+          opacity: 1;
+          pointer-events: auto;
+          transform: translate3d(0, 0, 0) scale(1);
+          filter: blur(0) saturate(1);
+          animation: honors-panel-fade-in 980ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+        .honors-swap-panel.is-inactive {
+          z-index: 1;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .honors-swap-panel {
+            animation: none !important;
+            transition: opacity 180ms ease;
+            transform: none !important;
+            filter: none !important;
+          }
+        }
+        .honors-content-panel {
+          bottom: clamp(4.25rem, 8dvh, 5rem);
+        }
+        .honors-pagination {
+          right: clamp(0.75rem, 2.4dvw, 1.35rem);
+          bottom: clamp(0.65rem, 1.9dvh, 1rem);
+        }
+        .honors-pagination-shell {
+          min-height: 1.38rem;
+          padding: 0.18rem;
+          border-radius: 999px;
+          background:
+            radial-gradient(circle at 28% 18%, rgba(255,255,255,0.42), transparent 34%),
+            linear-gradient(145deg, rgba(255,255,255,0.18), rgba(255,220,150,0.08) 46%, rgba(69,10,10,0.26)),
+            rgba(38,6,8,0.28);
+          border: 1px solid rgba(255,255,255,0.34);
+          box-shadow:
+            0 8px 18px rgba(69,10,10,0.22),
+            0 0 0 1px rgba(255,230,170,0.08),
+            inset 0 1px 0 rgba(255,255,255,0.54),
+            inset 0 -6px 10px rgba(69,10,10,0.18);
+          backdrop-filter: blur(14px) saturate(1.4);
+          -webkit-backdrop-filter: blur(14px) saturate(1.4);
+        }
+        .honors-pagination-dot {
+          position: relative;
+          height: 0.68rem;
+          width: 0.68rem;
+          flex: 0 0 auto;
+          border-radius: 999px;
+          overflow: hidden;
+          background:
+            radial-gradient(circle at 38% 30%, rgba(255,255,255,0.82), rgba(255,255,255,0.28) 42%, rgba(255,255,255,0.14) 100%);
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.54),
+            inset 0 -2px 5px rgba(69,10,10,0.16),
+            0 3px 7px rgba(69,10,10,0.12);
+          opacity: 0.76;
+          transform: translateZ(0);
+          transition: width 240ms cubic-bezier(0.34,1.2,0.64,1), opacity 180ms ease, transform 180ms ease, background 220ms ease, box-shadow 220ms ease;
+        }
+        .honors-pagination-dot::before {
+          content: "";
+          position: absolute;
+          inset: 0.23rem;
+          border-radius: inherit;
+          background: rgba(255,255,255,0.86);
+          box-shadow: 0 0 0 1px rgba(255,255,255,0.14), 0 2px 5px rgba(69,10,10,0.14);
+          transition: inset 220ms ease, background 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+        }
+        .honors-pagination-dot::after {
+          content: "";
+          position: absolute;
+          inset: 1px;
+          border-radius: inherit;
+          background: linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.58) 42%, transparent 68%);
+          opacity: 0;
+          transform: translateX(-80%);
+          transition: opacity 220ms ease, transform 520ms ease;
+        }
+        .honors-pagination-dot:hover {
+          opacity: 1;
+          transform: translateY(-1px);
+        }
+        .honors-pagination-dot.is-active {
+          width: 1.35rem;
+          opacity: 1;
+          background:
+            radial-gradient(circle at 22% 30%, rgba(255,255,255,1), rgba(255,244,210,0.92) 34%, transparent 48%),
+            linear-gradient(100deg, #fffdf5 0%, #ffe7a9 52%, #f4c45f 100%);
+          box-shadow:
+            0 5px 11px rgba(255,213,104,0.23),
+            0 0 0 1px rgba(255,255,255,0.32),
+            inset 0 1px 0 rgba(255,255,255,0.98),
+            inset 0 -3px 7px rgba(162,91,18,0.14);
+        }
+        .honors-pagination-dot.is-active::before {
+          inset: 0.17rem 0.28rem;
+          background: linear-gradient(90deg, #ffffff, #ffe8aa);
+          box-shadow: 0 3px 8px rgba(255,223,137,0.22);
+          transform: scaleX(1.02);
+        }
+        .honors-pagination-dot.is-active::after {
+          opacity: 0.72;
+          transform: translateX(90%);
+        }
+        .honors-title {
+          margin-bottom: clamp(0.75rem, 2.1dvh, 1.75rem);
+        }
+        .honors-title h1 {
+          font-size: clamp(1.35rem, 4.8dvw, 3.15rem);
+        }
+        .honors-title .honors-subtitle {
+          font-size: clamp(0.62rem, 1.45dvw, 0.94rem);
+        }
+        .honors-podium {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 0;
+          margin-top: clamp(0.7rem, 2.2dvh, 1.45rem);
+          margin-bottom: clamp(0.7rem, 2.2dvh, 1.45rem);
+        }
+        .honors-podium-track {
+          width: 100%;
+          max-height: 100%;
+        }
+        .honors-footer-ribbon {
+          padding-bottom: clamp(1.15rem, 2.8dvh, 1.9rem);
+        }
+        .honors-footer-ribbon-inner {
+          width: min(100%, 620px);
+        }
         .card-podium-1 {
           width: 36%;
-          height: 304px;
+          height: clamp(228px, 50dvh, 304px);
         }
         .card-podium-2 {
           width: 31%;
-          height: 274px;
+          height: clamp(208px, 45dvh, 274px);
         }
         .card-podium-3 {
           width: 28%;
-          height: 250px;
+          height: clamp(190px, 41dvh, 250px);
+        }
+        .mascot-feature-panel {
+          height: 100%;
+          min-height: 0;
         }
         @media (min-width: 640px) {
+          .honors-popup-card {
+            width: min(980px, calc(100vw - 2rem));
+            height: min(760px, calc(100dvh - 2rem));
+            max-height: calc(100dvh - 2rem);
+          }
           .card-podium-1 {
             width: 34%;
-            height: 370px;
+            height: clamp(280px, 52dvh, 370px);
           }
           .card-podium-2 {
             width: 30%;
-            height: 332px;
+            height: clamp(252px, 47dvh, 332px);
           }
           .card-podium-3 {
             width: 26%;
-            height: 296px;
+            height: clamp(226px, 42dvh, 296px);
           }
         }
         @media (min-width: 768px) {
           .card-podium-1 {
-            width: 286px;
-            height: 446px;
+            width: clamp(218px, 29dvw, 286px);
+            height: clamp(318px, 54dvh, 446px);
           }
           .card-podium-2 {
-            width: 246px;
-            height: 402px;
+            width: clamp(188px, 25dvw, 246px);
+            height: clamp(286px, 49dvh, 402px);
           }
           .card-podium-3 {
-            width: 218px;
-            height: 360px;
+            width: clamp(168px, 22dvw, 218px);
+            height: clamp(258px, 44dvh, 360px);
+          }
+        }
+        @media (max-height: 680px) {
+          .honors-title {
+            margin-bottom: 0.65rem;
+          }
+          .honors-title h1 {
+            font-size: clamp(1.22rem, 4.2dvw, 2.35rem);
+            line-height: 0.98;
+          }
+          .honors-title .honors-subtitle {
+            font-size: clamp(0.58rem, 1.2dvw, 0.78rem);
+          }
+          .honors-podium {
+            margin-top: 0.55rem;
+            margin-bottom: 0.6rem;
+          }
+          .honors-footer-ribbon {
+            padding-bottom: 0.95rem;
+          }
+          .card-podium-1 {
+            height: clamp(224px, 49dvh, 360px);
+          }
+          .card-podium-2 {
+            height: clamp(202px, 44dvh, 322px);
+          }
+          .card-podium-3 {
+            height: clamp(184px, 39dvh, 286px);
+          }
+        }
+        @media (max-height: 560px) {
+          .honors-popup-card {
+            height: calc(100dvh - 0.5rem);
+            max-height: calc(100dvh - 0.5rem);
+          }
+          .honors-stage {
+            padding-bottom: 3.25rem;
+          }
+          .honors-content-panel {
+            bottom: 3.65rem;
+          }
+          .honors-pagination-shell {
+            min-height: 1.22rem;
+            padding: 0.16rem;
+          }
+          .honors-pagination-dot {
+            height: 0.58rem;
+            width: 0.58rem;
+          }
+          .honors-pagination-dot.is-active {
+            width: 1.14rem;
+          }
+          .honors-title h1 {
+            font-size: clamp(1.08rem, 3.8dvw, 1.85rem);
+          }
+          .honors-podium {
+            margin-top: 0.35rem;
+            margin-bottom: 0.35rem;
+          }
+          .honors-podium-track {
+            gap: 0.35rem;
+          }
+          .honors-footer-ribbon {
+            padding-bottom: 0.55rem;
+          }
+          .card-podium-1 {
+            height: clamp(198px, 47dvh, 284px);
+          }
+          .card-podium-2 {
+            height: clamp(180px, 42dvh, 254px);
+          }
+          .card-podium-3 {
+            height: clamp(166px, 37dvh, 226px);
           }
         }
       `}</style>
 
        <div
          ref={cardRef}
-         className={cn('relative w-full max-w-[980px] max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] pointer-events-auto overflow-y-auto overflow-x-hidden rounded-[1.35rem] sm:rounded-[2rem] transition-opacity duration-300', showCard ? 'opacity-100' : 'opacity-0 pointer-events-none')}
+         className={cn('honors-popup-card relative pointer-events-auto overflow-hidden rounded-[1.35rem] sm:rounded-[2rem] transition-opacity duration-300', showCard ? 'opacity-100' : 'opacity-0 pointer-events-none')}
          style={{
            background: 'linear-gradient(135deg, #8f101f 0%, #c21c27 34%, #e43728 58%, #9b1219 100%)',
            boxShadow: '0 38px 96px -22px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.18), inset 0 1px 0 rgba(255,255,255,0.28)',
@@ -867,7 +1162,7 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full border border-white/30" style={{ animation: 'ring-expand 1.3s ease-out 0.05s both' }} />
           </div>
         )}
-         <button onClick={onClose} className="absolute top-2.5 right-2.5 sm:top-4 sm:right-4 z-30 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group transition-all duration-200 hover:scale-110" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.16), rgba(69,10,10,0.32))', border: '1px solid rgba(255, 255, 255, 0.48)', backdropFilter: 'blur(12px) saturate(1.4)', boxShadow: '0 10px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.34)' }} aria-label="Đóng">
+         <button onClick={onClose} className="absolute top-2.5 right-2.5 sm:top-4 sm:right-4 z-40 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group transition-all duration-200 hover:scale-110" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.16), rgba(69,10,10,0.32))', border: '1px solid rgba(255, 255, 255, 0.48)', backdropFilter: 'blur(12px) saturate(1.4)', boxShadow: '0 10px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.34)' }} aria-label="Đóng">
            <X className="w-4 h-4 text-white/80 group-hover:text-white group-hover:rotate-90 transition-all duration-300" />
          </button>
          <div className="absolute inset-y-0 left-0 right-0 z-30 pointer-events-none flex items-center justify-between px-2 sm:px-4">
@@ -888,20 +1183,23 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
              <ChevronRight className="h-5 w-5" strokeWidth={2.6} />
            </button>
          </div>
-         <div className="absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/25 bg-black/20 px-3 py-1.5 backdrop-blur-md">
-           {(['honors', 'feature'] as const).map(panel => (
-             <button
-               key={panel}
-               type="button"
-               onClick={() => setActivePanel(panel)}
-               className={cn('h-2.5 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70', activePanel === panel ? 'w-6 bg-white' : 'w-2.5 bg-white/45 hover:bg-white/70')}
-               aria-label={panel === 'honors' ? 'Mở popup vinh danh' : 'Mở popup tính năng mới'}
-             />
-           ))}
+         <div className="honors-pagination pointer-events-none absolute z-40">
+           <div className="honors-pagination-shell pointer-events-auto flex items-center gap-0.5">
+             {(['honors', 'feature'] as const).map(panel => (
+               <button
+                 key={panel}
+                 type="button"
+                 onClick={() => switchPanel(panel)}
+                 className={cn('honors-pagination-dot transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-red-950/40 hover:bg-white/55', activePanel === panel && 'is-active')}
+                 aria-label={panel === 'honors' ? 'Mở popup vinh danh' : 'Mở popup tính năng mới'}
+                 aria-current={activePanel === panel ? 'true' : undefined}
+               />
+             ))}
+           </div>
          </div>
-         <div className="relative z-10 min-h-[720px] px-3 pb-5 pt-5 sm:min-h-[760px] sm:px-5 sm:pb-7 sm:pt-7 md:min-h-[740px] md:px-10">
-           <div className={cn('absolute inset-x-3 top-5 transition-all duration-700 sm:inset-x-5 sm:top-7 md:inset-x-10', activePanel === 'honors' ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-3')}>
-           <div className={cn('text-center mb-4 sm:mb-7', contentPhase >= 1 ? 'anim-title-reveal' : 'opacity-0')}>
+         <div className={cn('honors-stage relative z-10 px-3 pt-5 sm:px-5 sm:pt-7 md:px-10', panelDirection === 'next' ? 'is-moving-next' : 'is-moving-prev')}>
+           <div className={cn('honors-panel honors-content-panel honors-swap-panel absolute inset-x-3 top-5 sm:inset-x-5 sm:top-7 md:inset-x-10', activePanel === 'honors' ? 'is-active' : 'is-inactive')}>
+           <div className={cn('honors-title text-center', contentPhase >= 1 ? 'anim-title-reveal' : 'opacity-0')}>
              <div className="inline-flex max-w-[calc(100%-3rem)] items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-7 py-2 rounded-full mb-3 sm:mb-4 relative overflow-hidden"
                style={{
                  background: 'linear-gradient(135deg, rgba(255,255,255,0.24) 0%, rgba(255,236,170,0.15) 44%, rgba(255,255,255,0.19) 100%)',
@@ -921,28 +1219,30 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
                </span>
                <Star className="relative z-[1] h-3.5 w-3.5 fill-white text-white drop-shadow-[0_2px_7px_rgba(0,0,0,0.32)]" />
              </div>
-             <h1 className="mx-auto max-w-[900px] text-[1.7rem] sm:text-[2.45rem] md:text-[3.15rem] font-black tracking-tight leading-[0.95] mb-2.5 text-white"
+             <h1 className="mx-auto max-w-[900px] font-black tracking-tight leading-[0.95] mb-2.5 text-white"
                style={{ animation: 'title-glow 3.8s ease-in-out infinite' }}>
                VINH DANH NGÔI SAO ĐÀO TẠO
              </h1>
              <div className="mx-auto flex max-w-[760px] items-center justify-center gap-2 sm:gap-3">
                <span className="hidden sm:block h-px flex-1 bg-gradient-to-r from-transparent via-yellow-200/58 to-transparent" />
-               <p className="text-[11px] sm:text-[14px] md:text-[15px] text-white/92 font-extrabold tracking-[0.08em] sm:tracking-[0.18em] drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]">TẬN TÂM TRÊN TỪNG BÀI GIẢNG · TRUYỀN CẢM HỨNG MỖI NGÀY</p>
+               <p className="honors-subtitle text-white/92 font-extrabold tracking-[0.08em] sm:tracking-[0.18em] drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)]">TẬN TÂM TRÊN TỪNG BÀI GIẢNG · TRUYỀN CẢM HỨNG MỖI NGÀY</p>
                <span className="hidden sm:block h-px flex-1 bg-gradient-to-r from-transparent via-yellow-200/58 to-transparent" />
              </div>
            </div>
-          <div className={cn('relative flex items-end justify-center gap-1.5 sm:gap-4 md:gap-8 mt-6 sm:mt-8 md:mt-[42px] mb-6 sm:mb-7 md:mb-[32px] w-full px-0 sm:px-2', contentPhase >= 2 ? '' : 'opacity-0')}>
-            <div className="absolute left-[5%] right-[5%] bottom-[-18px] h-[42px] rounded-[999px] opacity-65 blur-xl"
-              style={{ background: 'radial-gradient(ellipse at 50% 50%, rgba(69,10,10,0.42), transparent 68%)' }} />
-            {podium.map((teacher, idx) => {
-              const isFirst = idx === 1
-              const animCls = contentPhase >= 2 ? (isFirst ? 'anim-slide-center' : idx === 0 ? 'anim-slide-left' : 'anim-slide-right') : 'opacity-0'
-              return <PodiumCard key={teacher.teacher_code} teacher={teacher} idx={idx} animCls={animCls} triggerAnimate={contentPhase >= 2} />
-            })}
+          <div className={cn('honors-podium relative w-full', contentPhase >= 2 ? '' : 'opacity-0')}>
+            <div className="honors-podium-track relative flex items-end justify-center gap-1.5 px-0 sm:gap-4 sm:px-2 md:gap-8">
+              <div className="absolute left-[5%] right-[5%] bottom-[-18px] h-[42px] rounded-[999px] opacity-65 blur-xl"
+                style={{ background: 'radial-gradient(ellipse at 50% 50%, rgba(69,10,10,0.42), transparent 68%)' }} />
+              {podium.map((teacher, idx) => {
+                const isFirst = idx === 1
+                const animCls = contentPhase >= 2 ? (isFirst ? 'anim-slide-center' : idx === 0 ? 'anim-slide-left' : 'anim-slide-right') : 'opacity-0'
+                return <PodiumCard key={teacher.teacher_code} teacher={teacher} idx={idx} animCls={animCls} triggerAnimate={contentPhase >= 2} />
+              })}
+            </div>
           </div>
-           <div className={cn('transition-all duration-700', contentPhase >= 3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2')} style={{ transitionDelay: contentPhase >= 3 ? '0.6s' : '0s' }}>
-             <div className="flex items-center justify-center mb-3 sm:mb-4">
-               <div className="inline-flex max-w-[calc(100%-1.5rem)] items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-7 py-2 rounded-full relative overflow-hidden"
+           <div className={cn('honors-footer-ribbon transition-all duration-700', contentPhase >= 3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2')} style={{ transitionDelay: contentPhase >= 3 ? '0.6s' : '0s' }}>
+             <div className="flex items-center justify-center">
+               <div className="honors-footer-ribbon-inner inline-flex max-w-[calc(100%-3rem)] items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-7 py-2 rounded-full relative overflow-hidden"
                    style={{
                             background: 'linear-gradient(135deg, rgba(255,255,255,0.24) 0%, rgba(255,236,170,0.15) 44%, rgba(255,255,255,0.19) 100%)',
                             backdropFilter: 'blur(24px) saturate(1.6)',
@@ -964,7 +1264,7 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
              </div>
            </div>
            </div>
-           <div className={cn('absolute inset-x-3 top-5 transition-all duration-700 sm:inset-x-5 sm:top-7 md:inset-x-8', activePanel === 'feature' ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 translate-y-3')}>
+           <div className={cn('honors-content-panel honors-swap-panel absolute inset-x-3 top-5 sm:inset-x-5 sm:top-7 md:inset-x-8', activePanel === 'feature' ? 'is-active' : 'is-inactive')}>
              <MascotFeaturePanel onExplore={handleExploreMascotOutfits} />
            </div>
         </div>
@@ -1176,6 +1476,14 @@ export function TeacherHonorsPopup({ isOpen, onOpen, onClose }: TeacherHonorsPop
   useEffect(() => { triggerOpenRef.current = triggerOpen; triggerCloseRef.current = triggerClose }, [triggerOpen, triggerClose])
   useEffect(() => { if (isOpen) triggerOpenRef.current?.(); else if (renderCard) triggerCloseRef.current?.() }, [isOpen, renderCard])
   useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }, [])
+  useEffect(() => {
+    if (!renderCard) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [renderCard])
 
   const { data } = useSWR<TopTeachersResponse>('/api/truyenthong/top-teachers', fetcher, { revalidateOnFocus: false, revalidateOnReconnect: false, dedupingInterval: 300_000 })
   const teachers = data?.success && Array.isArray(data.data) ? data.data : []

@@ -6,7 +6,6 @@ import { useMemo, useState, useEffect } from 'react'
 import useSWR from 'swr'
 
 import { PageContainer } from '@/components/PageContainer'
-import { PageHeader } from '@/components/PageHeader'
 import { PageSkeleton } from '@/components/skeletons/PageSkeleton'
 import PostCard from '@/components/post-card'
 import HeroSection from '@/components/hero-section'
@@ -172,29 +171,7 @@ export default function CommunicationsPage() {
           }}
         />
 
-        {/* Header Section - Now after slider */}
-        <div className="bg-white">
-          <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 py-5 md:py-10">
-            <PageHeader
-              title="Truyền Thông Nội Bộ"
-              description="Cập nhật tin tức, sự kiện và thông báo mới nhất"
-              className="mb-0"
-              actions={
-                <div className="relative w-full md:w-80">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input
-                    placeholder="Tìm kiếm bài viết..."
-                    className="pl-10 w-full bg-white border-gray-200 focus:bg-white focus:border-[#a1001f] focus:ring-1 focus:ring-[#a1001f]/25 transition-all"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-              }
-            />
-          </div>
-        </div>
-
-        <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 md:py-4 space-y-6">
+        <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 pt-5 md:pt-8 space-y-6">
           {/* Two Column Layout: Main Content + Sidebar */}
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Main Content - Left Side */}
@@ -202,25 +179,44 @@ export default function CommunicationsPage() {
               <div className="flex flex-col gap-6 md:gap-8">
                 {/* Sticky Filter Bar — ẩn trên mobile khi sidebar đang mở */}
                 <div className={cn(
-                  "top-20 overflow-hidden rounded-2xl border border-gray-200/50 bg-white/95 shadow-sm backdrop-blur-sm",
+                  "top-20 overflow-hidden rounded-[1.15rem] border border-gray-200/70 bg-white/95 shadow-[0_16px_40px_rgba(15,23,42,0.055)] ring-1 ring-gray-100/70 backdrop-blur-sm",
                   isSidebarOpen && "hidden lg:block"
                 )}>
-                  <div className="flex items-center justify-between gap-4 overflow-x-auto p-2 no-scrollbar">
-                    <div className="flex p-1 gap-1">
-                      {postTypes.map((type) => (
-                        <Button
-                          key={type.value}
-                          variant={selectedFilter === type.value ? 'default' : 'ghost'}
-                          size="sm"
-                          onClick={() => setSelectedFilter(type.value)}
-                          className={cn(
-                            'whitespace-nowrap',
-                            selectedFilter === type.value && 'bg-gray-900 hover:bg-gray-800'
-                          )}
-                        >
-                          {type.label}
-                        </Button>
-                      ))}
+                  <div className="flex flex-col gap-2.5 p-2.5 md:p-3 xl:flex-row xl:items-center xl:justify-between">
+                    <div className="group/search relative order-1 w-full shrink-0 sm:max-w-[380px] xl:order-2 xl:w-[280px] 2xl:w-[300px]">
+                      <Search className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 transition-colors group-focus-within/search:text-[#a1001f] sm:h-4 sm:w-4" />
+                      <Input
+                        placeholder="Tìm kiếm bài viết..."
+                        className="h-9 w-full rounded-[0.8rem] border-gray-200 bg-gray-50/80 pl-9 pr-3 text-[13px] font-medium shadow-inner shadow-gray-100/70 transition-all placeholder:text-gray-400 hover:bg-white focus:bg-white focus:border-[#a1001f] focus:ring-2 focus:ring-[#a1001f]/15 sm:h-10 sm:pl-10 sm:text-sm"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="relative order-2 -mx-1 xl:order-1 xl:mx-0 xl:min-w-0 xl:flex-1">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-5 bg-gradient-to-r from-white via-white/85 to-transparent xl:hidden" />
+                      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-5 bg-gradient-to-l from-white via-white/85 to-transparent xl:hidden" />
+                      <div className="overflow-x-auto no-scrollbar px-1 scroll-smooth">
+                        <div className="flex min-w-max gap-0.5 rounded-[0.85rem] bg-gray-50/90 p-0.5 shadow-inner shadow-gray-200/50 xl:w-fit">
+                        {postTypes.map((type) => (
+                          <Button
+                            key={type.value}
+                            variant={selectedFilter === type.value ? 'default' : 'ghost'}
+                            size="sm"
+                            onClick={() => setSelectedFilter(type.value)}
+                            aria-pressed={selectedFilter === type.value}
+                            className={cn(
+                              'h-8 rounded-[0.65rem] px-2.5 text-[12px] font-semibold whitespace-nowrap transition-all sm:h-9 sm:px-3 sm:text-[13px] lg:px-3.5',
+                              selectedFilter === type.value
+                                ? 'bg-gray-900 text-white shadow-sm shadow-gray-900/15 hover:bg-gray-800'
+                                : 'text-gray-700 hover:bg-white hover:text-gray-950 hover:shadow-sm'
+                            )}
+                          >
+                            {type.label}
+                          </Button>
+                        ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
