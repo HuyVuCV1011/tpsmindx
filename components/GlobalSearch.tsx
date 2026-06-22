@@ -56,6 +56,7 @@ const adminSearchItems: SearchItem[] = [
   { label: 'Giáo trình chuyên môn', href: '/admin/giao-trinh-chuyen-mon', icon: BookOpen, group: 'Tài liệu nội bộ' },
   { label: 'Quản lý giáo trình', href: '/admin/quan-ly-tai-lieu-giang-day', icon: BookOpen, group: 'Tài liệu nội bộ' },
   { label: 'Quản lý tài khoản', href: '/admin/user-management', icon: Users, group: 'Cấu hình hệ thống' },
+  { label: 'Quản lý bé Mai', href: '/admin/quan-ly-be-mai', icon: Settings, group: 'Cấu hình hệ thống', keywords: ['mascot', 'outfit', 'trang phục', 'be mai'] },
   { label: 'Feedback Manager', href: '/admin/feedback', icon: FileText, group: 'Cấu hình hệ thống' },
   { label: 'Feedback Datasource Manager', href: '/admin/feedback?source=datasource', icon: FileText, group: 'Cấu hình hệ thống' },
   { label: 'Database Manager', href: '/admin/database', icon: Settings, group: 'Cấu hình hệ thống' },

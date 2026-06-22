@@ -173,6 +173,9 @@ export default function TeacherAssignmentPage() {
   const { teacherProfile, isLoading: isTeacherLoading } = useTeacher()
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const startId = searchParams.get('start_assignment_id')
+  const videoOk = searchParams.get('video_ok') === '1'
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [examAssignments, setExamAssignments] = useState<ExamAssignment[]>([])
   const [currentAssignment, setCurrentAssignment] = useState<Assignment | null>(
@@ -403,7 +406,7 @@ export default function TeacherAssignmentPage() {
 
         const response = await fetch('/api/training-submissions', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
           body: JSON.stringify({
             id: submission.id,
             action: 'grade',
@@ -443,6 +446,7 @@ export default function TeacherAssignmentPage() {
       try {
         if (
           assignment.video_id &&
+          !videoOk &&
           !['completed', 'watched'].includes(assignment.video_completion_status || '')
         ) {
           toast.error(
@@ -464,6 +468,7 @@ export default function TeacherAssignmentPage() {
           toast.error(
             'Thiếu thông tin giáo viên. Vui lòng tải lại dữ liệu rồi thử lại.',
           )
+          router.replace(pathname || '/user/dao-tao-nang-cao')
           return
         }
 
@@ -476,24 +481,27 @@ export default function TeacherAssignmentPage() {
           toast.error(
             'Thiếu thông tin Cơ sở (Branch). Vui lòng cập nhật thông tin.',
           )
+          router.replace(pathname || '/user/dao-tao-nang-cao')
           return
         }
 
         // Fetch questions
         const questionsRes = await fetch(
           `/api/training-assignment-questions?assignment_id=${assignment.id}`,
+          { headers: authHeaders(token) },
         )
         const questionsData = await questionsRes.json()
 
         if (!questionsData.success) {
           toast.error('Không thể tải câu hỏi')
+          router.replace(pathname || '/user/dao-tao-nang-cao')
           return
         }
 
         // Create submission
         const submissionRes = await fetch('/api/training-submissions', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
           body: JSON.stringify({
             teacher_code: teacherCode,
             assignment_id: assignment.id,
@@ -510,6 +518,7 @@ export default function TeacherAssignmentPage() {
         const submissionData = await submissionRes.json()
         if (!submissionData.success) {
           toast.error('Không thể bắt đầu bài tập: ' + submissionData.error)
+          router.replace(pathname || '/user/dao-tao-nang-cao')
           return
         }
 
@@ -591,6 +600,7 @@ export default function TeacherAssignmentPage() {
       } catch (err) {
         console.error('Error starting assignment:', err)
         toast.error('Lỗi khi bắt đầu bài tập')
+        router.replace(pathname || '/user/dao-tao-nang-cao')
       }
     },
     [
@@ -599,6 +609,9 @@ export default function TeacherAssignmentPage() {
       teacherCode,
       teacherProfile,
       user,
+      videoOk,
+      router,
+      pathname,
     ],
   )
 
@@ -608,7 +621,7 @@ export default function TeacherAssignmentPage() {
         setTrainingLoading(true)
 
         // 1. Fetch assignments list with teacher_code to get video completion status
-        const response = await fetch(`/api/training-assignments?status=published&teacher_code=${teacherCode}`)
+        const response = await fetch(`/api/training-assignments?status=published&teacher_code=${teacherCode}`, { headers: authHeaders(token) })
         const data = await response.json()
 
         if (data.success) {
@@ -620,6 +633,7 @@ export default function TeacherAssignmentPage() {
               // Fetch only graded/submitted submissions, ordered by created_at DESC
               const subRes = await fetch(
                 `/api/training-submissions?teacher_code=${teacherCode}&status=graded`,
+                { headers: authHeaders(token) },
               )
               const subData: { success?: boolean; data?: TrainingSubmissionSummary[] } =
                 await subRes.json()
@@ -709,6 +723,7 @@ export default function TeacherAssignmentPage() {
         // operate on complete data instead of only current month.
         const recentRes = await fetch(`/api/exam-assignments?${baseParams}`, {
           cache: 'no-store',
+          headers: authHeaders(token),
         })
         const recentData = await recentRes.json()
         if (recentData.success) {
@@ -725,9 +740,6 @@ export default function TeacherAssignmentPage() {
     [teacherCode, user],
   )
 
-  const searchParams = useSearchParams()
-  const startId = searchParams.get('start_assignment_id')
-
   // Auto-start assignment logic
   useEffect(() => {
     if (startId) {
@@ -738,7 +750,8 @@ export default function TeacherAssignmentPage() {
         if (target) {
           const isVideoFinished =
             target.video_completion_status === 'completed' ||
-            target.video_completion_status === 'watched';
+            target.video_completion_status === 'watched' ||
+            videoOk;
 
           if (
             target.video_id &&
@@ -755,7 +768,7 @@ export default function TeacherAssignmentPage() {
         }
       }
     }
-  }, [startId, activeMainTab, assignments, startAssignment, view, pathname, router])
+  }, [startId, videoOk, activeMainTab, assignments, startAssignment, view, pathname, router])
 
   // Helper function to safely parse percentage
   const formatPercentage = (
@@ -855,7 +868,7 @@ export default function TeacherAssignmentPage() {
 
       await fetch('/api/training-submissions', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
         body: JSON.stringify({
           id: submissionId,
           action: 'save_draft',

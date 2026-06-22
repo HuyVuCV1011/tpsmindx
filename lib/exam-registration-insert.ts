@@ -337,16 +337,11 @@ export async function insertExamRegistration(
     const errorMessage = error instanceof Error ? error.message : String(error);
     const pgError = error as { code?: string; detail?: string; constraint?: string };
     
-    // Log chi tiết để debug
     console.error("Error details:", {
       message: errorMessage,
       code: pgError?.code,
       detail: pgError?.detail,
       constraint: pgError?.constraint,
-      teacher_code: ma_giao_vien,
-      subject_id: resolvedSubjectId,
-      event_id: id_su_kien,
-      flow_round: resolvedSupplementaryRound,
     });
     
     return { 

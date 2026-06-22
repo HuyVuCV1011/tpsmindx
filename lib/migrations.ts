@@ -2385,8 +2385,43 @@ const migrations: Migration[] = [
     `,
   },
   {
-    name: 'V98_exam_feedback_reviews',
+    name: 'V98_teacher_monthly_honors',
     version: 98,
+    sql: `
+      CREATE TABLE IF NOT EXISTS teacher_monthly_honors (
+        id SERIAL PRIMARY KEY,
+        stt INTEGER,
+        full_name VARCHAR(255) NOT NULL,
+        email VARCHAR(255),
+        khoi_day VARCHAR(100),
+        co_so VARCHAR(255),
+        thang VARCHAR(20) NOT NULL,
+        so_case INTEGER DEFAULT 0,
+        so_hoc_sinh INTEGER DEFAULT 0,
+        ti_le NUMERIC(5,2) DEFAULT 0,
+        loai VARCHAR(100),
+        thuong_cr NUMERIC(15,2) DEFAULT 0,
+        avatar_url TEXT,
+        imported_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        imported_by VARCHAR(255),
+        UNIQUE(email, thang)
+      );
+      CREATE INDEX IF NOT EXISTS idx_teacher_monthly_honors_thang
+        ON teacher_monthly_honors(thang, stt ASC);
+      CREATE INDEX IF NOT EXISTS idx_teacher_monthly_honors_email
+        ON teacher_monthly_honors(email);
+    `,
+  },
+  {
+    name: 'V99_add_avatar_url_to_app_users',
+    version: 99,
+    sql: `
+      ALTER TABLE app_users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+    `,
+  },
+  {
+    name: 'V100_exam_feedback_reviews',
+    version: 100,
     sql: `
       CREATE TABLE IF NOT EXISTS exam_feedback_reviews (
         id BIGSERIAL PRIMARY KEY,
@@ -2449,8 +2484,8 @@ const migrations: Migration[] = [
     `,
   },
   {
-    name: 'V99_push_subscriptions',
-    version: 99,
+    name: 'V101_push_subscriptions',
+    version: 101,
     sql: `
       CREATE TABLE IF NOT EXISTS push_subscriptions (
         id BIGSERIAL PRIMARY KEY,
@@ -2471,6 +2506,57 @@ const migrations: Migration[] = [
         ON push_subscriptions;
       CREATE TRIGGER trg_push_subscriptions_updated_at
       BEFORE UPDATE ON push_subscriptions
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+    `,
+  },
+  {
+    name: 'V102_trang_phuc_mascot',
+    version: 102,
+    sql: `
+      CREATE TABLE IF NOT EXISTS trang_phuc_mascot (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        country_code TEXT NOT NULL,
+        flag_code TEXT NOT NULL,
+        slug TEXT NOT NULL UNIQUE,
+        colors JSONB NOT NULL DEFAULT '[]'::jsonb,
+        frames INTEGER NOT NULL DEFAULT 25,
+        status TEXT NOT NULL DEFAULT 'ready' CHECK (status IN ('draft', 'ready')),
+        available BOOLEAN NOT NULL DEFAULT true,
+        tag TEXT DEFAULT 'new',
+        color TEXT NOT NULL DEFAULT '#a1001f',
+        bg_color TEXT NOT NULL DEFAULT '#fff5f5',
+        static_mode BOOLEAN NOT NULL DEFAULT true,
+        preview_static TEXT,
+        sprite_base TEXT,
+        preview_frames JSONB,
+        jump_frames JSONB,
+        wave_frames JSONB,
+        sort_order INTEGER NOT NULL DEFAULT 100,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_trang_phuc_mascot_status_order
+        ON trang_phuc_mascot(status, available, sort_order, updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_trang_phuc_mascot_country_code
+        ON trang_phuc_mascot(country_code);
+
+      INSERT INTO trang_phuc_mascot
+        (id, name, country_code, flag_code, slug, colors, frames, status, available, tag, color, bg_color, static_mode, preview_static, sprite_base, sort_order)
+      VALUES
+        ('mascot-vn', 'Việt Nam', 'VN', 'vn', 'mascot-vn', '["#da251d", "#ffde00", "#b91c1c"]'::jsonb, 25, 'ready', true, 'new', '#dc2626', '#fff5f5', true, '/mascot/mascot-vn.png', '/mascot/mascot-vn-sheet.png', 10),
+        ('mascot-bdn', 'Bồ Đào Nha', 'PT', 'pt', 'mascot-bdn', '["#006847", "#ffcc00", "#ce1126"]'::jsonb, 25, 'ready', true, 'new', '#16a34a', '#fff5f5', true, '/mascot/mascot-bdn.png', '/mascot/mascot-bdn-sheet.png', 20),
+        ('mascot-bz', 'Brazil', 'BR', 'br', 'mascot-bz', '["#009b3a", "#ffdf00", "#002776"]'::jsonb, 25, 'ready', true, 'new', '#eab308', '#fff5f5', true, '/mascot/mascot-bz.png', '/mascot/mascot-bz-sheet.png', 30),
+        ('mascot-phap', 'Pháp', 'FR', 'fr', 'mascot-phap', '["#0055a4", "#ffffff", "#ef4135"]'::jsonb, 25, 'ready', true, 'new', '#2563eb', '#fff5f5', true, '/mascot/mascot-phap.png', '/mascot/mascot-phap-sheet.png', 40),
+        ('mascot-argen', 'Argentina', 'AR', 'ar', 'mascot-argen', '["#74acdf", "#ffffff", "#f6b40e"]'::jsonb, 25, 'ready', true, 'new', '#38bdf8', '#fff5f5', true, '/mascot/mascot-argen.png', '/mascot/mascot-argen-sheet.png', 50)
+      ON CONFLICT (id) DO NOTHING;
+
+      DROP TRIGGER IF EXISTS trg_trang_phuc_mascot_updated_at
+        ON trang_phuc_mascot;
+      CREATE TRIGGER trg_trang_phuc_mascot_updated_at
+      BEFORE UPDATE ON trang_phuc_mascot
       FOR EACH ROW
       EXECUTE FUNCTION update_updated_at_column();
     `,
