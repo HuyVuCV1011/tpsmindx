@@ -641,7 +641,25 @@ function MascotFeaturePanel({ onExplore }: { onExplore: () => void }) {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="mt-5 grid grid-cols-3 gap-1.5 sm:hidden">
+            {[
+              { icon: Shirt, shortTitle: 'Chọn áo', title: 'Chọn áo đội tuyển', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
+              { icon: Eye, shortTitle: 'Preview', title: 'Xem preview trước', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+              { icon: Save, shortTitle: 'Lưu ngay', title: 'Lưu và dùng ngay', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+            ].map(({ icon: Icon, shortTitle, title, color, bg, border }) => (
+              <div
+                key={title}
+                className={`flex min-w-0 items-center justify-center gap-1.5 rounded-full border ${border} ${bg} px-2 py-2 shadow-sm`}
+                aria-label={title}
+                title={title}
+              >
+                <Icon className={`h-4 w-4 shrink-0 ${color}`} strokeWidth={2.5} />
+                <span className="min-w-0 truncate text-[11px] font-black leading-none text-slate-900">{shortTitle}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 hidden gap-3 sm:grid sm:grid-cols-3">
             {[
               { icon: Shirt, title: 'Chọn áo đội tuyển', body: 'Bấm vào bé Mai ở góc phải để mở tủ đồ và chọn bộ theo quốc gia bạn thích.', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
               { icon: Eye, title: 'Xem preview trước', body: 'Animation chạy ngay trong modal để bạn biết bộ nào hợp nhất trước khi lưu.', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
@@ -988,7 +1006,7 @@ function MascotOutfitFeatureModal({ open, onClose }: { open: boolean; onClose: (
         role="dialog"
         aria-modal="true"
         aria-label="Giới thiệu tính năng thay đổi trang phục mascot"
-        className="relative w-full max-w-[640px] overflow-hidden rounded-[1.6rem] border border-red-100 text-slate-900 shadow-[0_32px_90px_rgba(15,23,42,0.28)]"
+        className="relative w-full max-w-[640px] overflow-hidden rounded-[1.25rem] border border-red-100 text-slate-900 shadow-[0_32px_90px_rgba(15,23,42,0.28)] sm:rounded-[1.6rem]"
         style={{
           background: 'radial-gradient(circle at 15% 10%, rgba(254,226,226,0.95), transparent 32%), radial-gradient(circle at 86% 14%, rgba(220,252,231,0.9), transparent 28%), linear-gradient(135deg, #fffaf7 0%, #ffffff 46%, #fff1f2 100%)',
         }}
@@ -1012,30 +1030,48 @@ function MascotOutfitFeatureModal({ open, onClose }: { open: boolean; onClose: (
           <X className="h-4 w-4" />
         </button>
 
-        <div className="relative z-10 p-5 sm:p-7">
+        <div className="relative z-10 p-4 sm:p-7">
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-red-700">
             <Sparkles className="h-4 w-4" />
             Tính năng mới
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-[1fr_190px] sm:items-center">
+          <div className="grid gap-4 sm:grid-cols-[1fr_190px] sm:items-center sm:gap-5">
             <div>
-              <h2 className="text-2xl font-black leading-tight text-slate-950 sm:text-3xl">Thay đổi trang phục cho mascot bé Mai</h2>
-              <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+              <h2 className="pr-9 text-[1.35rem] font-black leading-tight text-slate-950 sm:pr-0 sm:text-3xl">Thay đổi trang phục cho mascot bé Mai</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600 sm:mt-3">
                 Bé Mai đã có tủ đồ World Cup: chọn outfit theo đội tuyển yêu thích, xem animation trong modal và lưu để mascot ngoài màn hình dùng ngay bộ trang phục mới.
               </p>
             </div>
 
-            <div className="relative mx-auto flex h-44 w-44 items-center justify-center">
+            <div className="relative mx-auto flex h-32 w-32 items-center justify-center sm:h-44 sm:w-44">
               <div className="absolute inset-0 rounded-full bg-yellow-300/30 blur-2xl" />
-              <div className="relative flex h-36 w-36 items-center justify-center rounded-full border border-yellow-200 bg-white shadow-[0_18px_45px_rgba(251,191,36,0.22)]">
-                <Trophy className="h-16 w-16 text-yellow-300 drop-shadow-[0_8px_22px_rgba(250,204,21,0.45)]" strokeWidth={2.2} />
+              <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-yellow-200 bg-white shadow-[0_18px_45px_rgba(251,191,36,0.22)] sm:h-36 sm:w-36">
+                <Trophy className="h-12 w-12 text-yellow-300 drop-shadow-[0_8px_22px_rgba(250,204,21,0.45)] sm:h-16 sm:w-16" strokeWidth={2.2} />
                 <span className="absolute -bottom-2 rounded-full bg-red-600 px-3 py-1 text-[11px] font-black text-white shadow">WC 2026</span>
               </div>
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="mt-5 grid grid-cols-3 gap-1.5 sm:hidden">
+            {[
+              { icon: Shirt, shortTitle: 'Chọn áo', title: 'Chọn áo đội tuyển', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
+              { icon: Eye, shortTitle: 'Preview', title: 'Xem preview trước', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+              { icon: Save, shortTitle: 'Lưu ngay', title: 'Lưu và dùng ngay', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+            ].map(({ icon: Icon, shortTitle, title, color, bg, border }) => (
+              <div
+                key={title}
+                className={`flex min-w-0 items-center justify-center gap-1.5 rounded-full border ${border} ${bg} px-2 py-2 shadow-sm`}
+                aria-label={title}
+                title={title}
+              >
+                <Icon className={`h-4 w-4 shrink-0 ${color}`} strokeWidth={2.5} />
+                <span className="min-w-0 truncate text-[11px] font-black leading-none text-slate-900">{shortTitle}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 hidden gap-3 sm:grid sm:grid-cols-3">
             {[
               { icon: Shirt, title: 'Chọn áo đội tuyển', body: 'Mở tủ đồ bằng cách bấm vào bé Mai ở góc phải và chọn bộ theo quốc gia bạn thích.', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
               { icon: Eye, title: 'Xem preview trước', body: 'Animation chạy ngay trong modal để bạn biết bộ nào hợp nhất.', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
