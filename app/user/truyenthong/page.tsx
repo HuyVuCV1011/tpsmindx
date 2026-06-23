@@ -179,25 +179,15 @@ export default function CommunicationsPage() {
               <div className="flex flex-col gap-6 md:gap-8">
                 {/* Sticky Filter Bar — ẩn trên mobile khi sidebar đang mở */}
                 <div className={cn(
-                  "top-20 overflow-hidden rounded-[1.15rem] border border-gray-200/70 bg-white/95 shadow-[0_16px_40px_rgba(15,23,42,0.055)] ring-1 ring-gray-100/70 backdrop-blur-sm",
+                  "top-20 overflow-hidden rounded-[1.15rem] border border-gray-200/80 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.055)]",
                   isSidebarOpen && "hidden lg:block"
                 )}>
-                  <div className="flex flex-col gap-2.5 p-2.5 md:p-3 xl:flex-row xl:items-center xl:justify-between">
-                    <div className="group/search relative order-1 w-full shrink-0 sm:max-w-[380px] xl:order-2 xl:w-[280px] 2xl:w-[300px]">
-                      <Search className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 transition-colors group-focus-within/search:text-[#a1001f] sm:h-4 sm:w-4" />
-                      <Input
-                        placeholder="Tìm kiếm bài viết..."
-                        className="h-9 w-full rounded-[0.8rem] border-gray-200 bg-gray-50/80 pl-9 pr-3 text-[13px] font-medium shadow-inner shadow-gray-100/70 transition-all placeholder:text-gray-400 hover:bg-white focus:bg-white focus:border-[#a1001f] focus:ring-2 focus:ring-[#a1001f]/15 sm:h-10 sm:pl-10 sm:text-sm"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="relative order-2 -mx-1 xl:order-1 xl:mx-0 xl:min-w-0 xl:flex-1">
+                  <div className="flex h-[64px] items-center p-2.5">
+                    <div className="relative -mx-1 xl:mx-0">
                       <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-5 bg-gradient-to-r from-white via-white/85 to-transparent xl:hidden" />
                       <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-5 bg-gradient-to-l from-white via-white/85 to-transparent xl:hidden" />
                       <div className="overflow-x-auto no-scrollbar px-1 scroll-smooth">
-                        <div className="flex min-w-max gap-0.5 rounded-[0.85rem] bg-gray-50/90 p-0.5 shadow-inner shadow-gray-200/50 xl:w-fit">
+                        <div className="flex min-w-max gap-1 rounded-[0.85rem] bg-gray-50 p-1 shadow-inner shadow-gray-200/40 xl:w-fit">
                         {postTypes.map((type) => (
                           <Button
                             key={type.value}
@@ -206,7 +196,7 @@ export default function CommunicationsPage() {
                             onClick={() => setSelectedFilter(type.value)}
                             aria-pressed={selectedFilter === type.value}
                             className={cn(
-                              'h-8 rounded-[0.65rem] px-2.5 text-[12px] font-semibold whitespace-nowrap transition-all sm:h-9 sm:px-3 sm:text-[13px] lg:px-3.5',
+                              'h-10 rounded-[0.65rem] px-3 text-[13px] font-semibold whitespace-nowrap transition-all lg:px-3.5',
                               selectedFilter === type.value
                                 ? 'bg-gray-900 text-white shadow-sm shadow-gray-900/15 hover:bg-gray-800'
                                 : 'text-gray-700 hover:bg-white hover:text-gray-950 hover:shadow-sm'
@@ -225,7 +215,10 @@ export default function CommunicationsPage() {
                 {filteredPosts.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-500">
                     {filteredPosts.map((post, index) => (
-                      <div key={`${post.id || post.slug || 'post'}-${index}`}>
+                      <div
+                        key={`${post.id || post.slug || 'post'}-${index}`}
+                        className="lg:h-[460px] xl:h-[480px]"
+                      >
                         <PostCard post={post} />
                       </div>
                     ))}
@@ -248,8 +241,20 @@ export default function CommunicationsPage() {
 
             {/* Sidebar - Right Side */}
             <aside className="w-full lg:w-80 shrink-0">
-              <div>
-                <UpcomingEventsSidebar />
+              <div className="space-y-6">
+                <div className="flex h-[64px] items-center rounded-[1.15rem] border border-gray-200/80 bg-white p-2.5 shadow-[0_10px_30px_rgba(15,23,42,0.055)]">
+                  <div className="group/search relative w-full">
+                    <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 transition-colors group-focus-within/search:text-[#a1001f]" />
+                    <Input
+                      placeholder="Tìm kiếm bài viết..."
+                      aria-label="Tìm kiếm bài viết"
+                      className="h-10 w-full rounded-[0.8rem] border-gray-200 bg-gray-50 pl-10 pr-3 text-sm font-medium shadow-inner shadow-gray-200/40 transition-all placeholder:text-gray-400 hover:border-gray-300 hover:bg-white focus:border-[#a1001f] focus:bg-white focus:ring-2 focus:ring-[#a1001f]/15"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <UpcomingEventsSidebar upcomingCardClassName="lg:h-[460px] xl:h-[480px]" />
               </div>
             </aside>
           </div>
