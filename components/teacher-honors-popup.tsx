@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, memo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ChevronLeft, ChevronRight, Crown, Eye, Save, Shirt, Star, Sparkles, Trophy } from 'lucide-react'
 import useSWR from 'swr'
@@ -23,6 +23,30 @@ interface Rect { x: number; y: number; w: number; h: number }
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
+const MOCK_TOP_TEACHERS: Teacher[] = [
+  {
+    teacher_code: 'mock-rank-1',
+    full_name: 'MindX',
+    center: 'MindX Nguyễn Trãi',
+    total_score: 9.86,
+    avatar_url: null,
+  },
+  {
+    teacher_code: 'mock-rank-2',
+    full_name: 'MindX',
+    center: 'MindX Online',
+    total_score: 9.72,
+    avatar_url: null,
+  },
+  {
+    teacher_code: 'mock-rank-3',
+    full_name: 'MindX',
+    center: 'MindX Phạm Ngũ Lão',
+    total_score: 9.58,
+    avatar_url: null,
+  },
+]
+
 function initials(name: string) {
   const p = name.trim().split(/\s+/)
   return p.length === 1 ? p[0].slice(0, 2).toUpperCase()
@@ -33,6 +57,17 @@ function fittedFontSize(length: number, minPx: number, maxPx: number, vwFactor: 
   const safeLength = Math.max(length, 10)
   const preferredVw = Math.max(minPx / 3.9, vwFactor / safeLength)
   return `clamp(${minPx}px, ${preferredVw.toFixed(3)}vw, ${maxPx}px)`
+}
+
+function shouldReduceVisualEffects() {
+  if (typeof window === 'undefined') return false
+  const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
+  const cores = navigator.hardwareConcurrency || 8
+  return (
+    window.matchMedia('(max-width: 767px), (pointer: coarse), (prefers-reduced-motion: reduce)').matches ||
+    connection?.saveData === true ||
+    cores <= 4
+  )
 }
 
 // ─── Easing ──────────────────────────────────────────────────────────────────
@@ -124,11 +159,6 @@ interface Particle {
   size: number; opacity: number; decay: number; color: string
 }
 
-interface Confetti {
-  x: number; y: number; vy: number; vx: number
-  size: number; rotation: number; vRot: number; color: string; opacity: number; points: number
-}
-
 function spawnParticles(cx: number, cy: number, count: number): Particle[] {
   // Champagne & gold particle palette
   const colors = ['#d4b46a', '#e8c97a', '#f4ecd5', '#ffffff', '#c9a84c', '#ffe8a0', '#f5d78e']
@@ -148,86 +178,39 @@ function spawnParticles(cx: number, cy: number, count: number): Particle[] {
   })
 }
 
-function spawnConfetti(width: number, count: number): Confetti[] {
-  // Champagne gold confetti palette
-  const colors = ['#d4b46a', '#e8c97a', '#c9a84c', '#f5d78e', '#ffe8a0', '#ffffff', '#f4ecd5', '#f0d89a']
-  return Array.from({ length: count }, () => ({
-    x: Math.random() * width,
-    y: -Math.random() * 300,
-    vy: 1.5 + Math.random() * 2.5,
-    vx: (Math.random() - 0.5) * 1.2,
-    size: 3 + Math.random() * 5,
-    rotation: Math.random() * Math.PI * 2,
-    vRot: (Math.random() - 0.5) * 0.1,
-    color: colors[Math.floor(Math.random() * colors.length)],
-    opacity: 1,
-    points: Math.random() > 0.7 ? 5 : 4,
-  }))
-}
-
-function drawStar(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, p: number, color: string, opacity: number) {
-  ctx.save()
-  ctx.translate(x, y)
-  const twinkle = 0.7 + Math.sin(Date.now() * 0.01 + x) * 0.3
-  const currentOpacity = opacity * twinkle
-  ctx.beginPath()
-  ctx.globalAlpha = currentOpacity
-  ctx.fillStyle = color
-  const innerRadius = p === 4 ? r * 0.25 : r * 0.4
-  for (let i = 0; i < p * 2; i++) {
-    const radius = i % 2 === 0 ? r : innerRadius
-    const angle = (i * Math.PI) / p
-    ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius)
-  }
-  ctx.closePath()
-  ctx.fill()
-  ctx.globalAlpha = currentOpacity * 0.4
-  ctx.beginPath()
-  ctx.arc(0, 0, r * 2, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.restore()
-}
+const CONFETTI_COLORS = ['#d4b46a', '#e8c97a', '#c9a84c', '#f5d78e', '#ffe8a0', '#ffffff', '#f4ecd5', '#f0d89a']
+const CSS_CONFETTI = Array.from({ length: 50 }, (_, index) => ({
+  left: (index * 37 + 11) % 100,
+  size: 4 + ((index * 7) % 6),
+  duration: 5.8 + ((index * 13) % 28) / 10,
+  delay: -((index * 17) % 82) / 10,
+  drift: ((index * 29) % 100) - 50,
+  rotation: 240 + ((index * 47) % 540),
+  color: CONFETTI_COLORS[index % CONFETTI_COLORS.length],
+  shape: index % 5 === 0 ? 'star' : index % 3 === 0 ? 'diamond' : 'ribbon',
+}))
 
 function ConfettiRain({ active }: { active: boolean }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  useEffect(() => {
-    if (!active) return
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const resize = () => {
-      const parent = canvas.parentElement
-      if (parent) {
-        canvas.width = parent.clientWidth
-        canvas.height = parent.clientHeight
-      }
-    }
-    resize()
-    window.addEventListener('resize', resize)
-    const particles = spawnConfetti(canvas.width, 80)
-    let animationFrame: number
-    const render = () => {
-      const ctx = canvas.getContext('2d', { alpha: true })
-      if (!ctx) return
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      particles.forEach(p => {
-        p.y += p.vy; p.x += p.vx; p.rotation += p.vRot
-        if (p.y > canvas.height + 20) { p.y = -20; p.x = Math.random() * canvas.width }
-        ctx.save()
-        ctx.translate(p.x, p.y)
-        ctx.rotate(p.rotation)
-        drawStar(ctx, 0, 0, p.size, p.points, p.color, p.opacity)
-        ctx.restore()
-      })
-      animationFrame = requestAnimationFrame(render)
-    }
-    render()
-    return () => {
-      cancelAnimationFrame(animationFrame)
-      window.removeEventListener('resize', resize)
-    }
-  }, [active])
   if (!active) return null
-  return <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none z-10" />
+  return (
+    <div className="honors-confetti absolute inset-0 z-10 overflow-hidden pointer-events-none" aria-hidden>
+      {CSS_CONFETTI.map((particle, index) => (
+        <i
+          key={index}
+          className={`honors-confetti-piece is-${particle.shape}`}
+          style={{
+            '--confetti-left': `${particle.left}%`,
+            '--confetti-size': `${particle.size}px`,
+            '--confetti-duration': `${particle.duration}s`,
+            '--confetti-delay': `${particle.delay}s`,
+            '--confetti-drift': `${particle.drift}px`,
+            '--confetti-rotation': `${particle.rotation}deg`,
+            '--confetti-color': particle.color,
+          } as React.CSSProperties}
+        />
+      ))}
+    </div>
+  )
 }
 
 // ─── 3D Tilt Card ─────────────────────────────────────────────────────────────
@@ -245,16 +228,23 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
   const rafTilt = useRef<number | null>(null)
   const targetTilt = useRef({ x: 0, y: 0 })
   const currentTilt = useRef({ x: 0, y: 0 })
-  const sparkleTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [sparkles, setSparkles] = useState<{ id: number; x: number; y: number }[]>([])
-  const sparkleId = useRef(0)
-  const [displayScore, setDisplayScore] = useState(0)
+  const scoreEl = useRef<HTMLSpanElement>(null)
+  const [avatarFailed, setAvatarFailed] = useState(false)
+  const allowInteractiveEffects = useRef(true)
 
   const isFirst = idx === 1
 
   useEffect(() => {
+    setAvatarFailed(false)
+  }, [teacher.avatar_url])
+
+  useEffect(() => {
+    allowInteractiveEffects.current = !shouldReduceVisualEffects()
+  }, [])
+
+  useEffect(() => {
     if (!triggerAnimate) {
-      setDisplayScore(0)
+      if (scoreEl.current) scoreEl.current.textContent = '0.00%'
       return
     }
     let startTimestamp: number | null = null
@@ -265,7 +255,7 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
       if (!startTimestamp) startTimestamp = timestamp
       const progress = Math.min((timestamp - startTimestamp) / duration, 1)
       const easeProgress = 1 - Math.pow(1 - progress, 3)
-      setDisplayScore(easeProgress * target)
+      if (scoreEl.current) scoreEl.current.textContent = `${(easeProgress * target).toFixed(2)}%`
       if (progress < 1) {
         rafId = requestAnimationFrame(animate)
       }
@@ -274,7 +264,7 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
     return () => cancelAnimationFrame(rafId)
   }, [triggerAnimate, teacher.total_score])
 
-  const configs = [
+  const configs = useMemo(() => ([
     { // Hạng II
       bg: 'radial-gradient(circle at 18% 9%, rgba(255,255,255,0.74) 0%, rgba(255,255,255,0.28) 24%, transparent 44%), radial-gradient(circle at 86% 78%, rgba(185,232,244,0.38) 0%, transparent 46%), linear-gradient(145deg, rgba(238,251,255,0.42), rgba(255,255,255,0.16) 42%, rgba(205,236,248,0.28) 100%)',
       border: 'border',
@@ -371,7 +361,7 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
       liquidTint: 'rgba(185, 232, 244, 0.22)',
       halo: 'radial-gradient(circle at 50% 25%, rgba(226, 250, 255, 0.3), transparent 58%)',
     },
-  ]
+  ]), [])
   const cfg = configs[idx]
   const nameFontSize = fittedFontSize(teacher.full_name.length, isFirst ? 11 : 9, isFirst ? 16 : 13, isFirst ? 60 : 45)
   const centerFontSize = fittedFontSize(teacher.center.length, isFirst ? 8.5 : 7.5, isFirst ? 12 : 10.5, isFirst ? 55 : 42)
@@ -393,17 +383,13 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
   }, [cfg.glow, cfg.tiltGlow])
 
   const onMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!allowInteractiveEffects.current) return
     const el = cardEl.current; if (!el) return
     const r = el.getBoundingClientRect()
     const nx = (e.clientX - r.left) / r.width - 0.5
     const ny = (e.clientY - r.top) / r.height - 0.5
     targetTilt.current = { x: -ny * 14, y: nx * 14 }
     if (!rafTilt.current) rafTilt.current = requestAnimationFrame(animateTilt)
-    if (sparkleTimeout.current) return
-    sparkleTimeout.current = setTimeout(() => { sparkleTimeout.current = null }, 120)
-    const id = ++sparkleId.current; const sx = e.clientX - r.left; const sy = e.clientY - r.top
-    setSparkles(prev => [...prev.slice(-6), { id, x: sx, y: sy }])
-    setTimeout(() => setSparkles(prev => prev.filter(s => s.id !== id)), 700)
   }, [animateTilt])
 
   const onMouseLeave = useCallback(() => {
@@ -417,7 +403,7 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
 
   return (
     <div
-      className={cn('relative flex-shrink cursor-pointer flex flex-col', `card-podium-${idx === 1 ? 1 : idx === 0 ? 2 : 3}`, animCls, isFirst ? 'z-10' : 'z-0')}
+      className={cn('podium-card-wrap relative flex-shrink cursor-pointer flex flex-col', `card-podium-${idx === 1 ? 1 : idx === 0 ? 2 : 3}`, animCls, isFirst ? 'z-10' : 'z-0')}
       style={{ perspective: '900px', transform: 'translateZ(0)' }}
       onMouseMove={onMouseMove}
       onMouseLeave={onMouseLeave}
@@ -428,7 +414,7 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
       )}
 
       {/* Rank label above card */}
-      <div className={cn("relative flex items-center justify-center gap-1.5 mb-1.5 sm:mb-2", isFirst ? "scale-105" : "")}>
+      <div className={cn("podium-rank-label relative flex items-center justify-center gap-1.5 mb-1.5 sm:mb-2", isFirst ? "scale-105" : "")}>
         {idx === 1 && <Trophy className={cn("text-yellow-300 fill-yellow-300 drop-shadow-[0_2px_8px_rgba(250,204,21,0.65)]", isFirst ? "w-4 h-4 sm:w-5 sm:h-5" : "w-3 h-3")} />}
         {idx === 0 && <Crown className={cn("text-slate-100 fill-slate-100 drop-shadow-[0_2px_8px_rgba(226,232,240,0.45)]", "w-3.5 h-3.5 sm:w-4 sm:h-4")} />}
         {idx === 2 && <Star className={cn("text-orange-300 fill-orange-300 drop-shadow-[0_2px_8px_rgba(251,146,60,0.5)]", "w-3.5 h-3.5 sm:w-4 sm:h-4")} />}
@@ -442,7 +428,7 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
 
       <div
         ref={cardEl}
-        className={cn('relative w-full flex flex-col rounded-[24px] sm:rounded-[30px] overflow-hidden flex-1', cfg.border)}
+        className={cn('podium-card-shell relative w-full flex flex-col rounded-[24px] sm:rounded-[30px] overflow-hidden flex-1', cfg.border)}
         style={{
           background: cfg.bg,
           boxShadow: cfg.shadow,
@@ -476,7 +462,7 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
         <div className="absolute inset-y-5 right-2 w-px bg-gradient-to-b from-transparent via-white/36 to-transparent z-20 pointer-events-none" />
 
         {/* Avatar area — fills top portion */}
-        <div className="relative z-30 mx-2 mt-2 mb-0 flex-1 rounded-[20px] sm:rounded-[24px]"
+        <div className="podium-avatar relative z-30 mx-2 mt-2 mb-0 flex-1 rounded-[20px] sm:rounded-[24px]"
           style={{
             minHeight: 0,
             transform: 'translateZ(46px)',
@@ -496,8 +482,8 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
             }}>
           {/* Avatar image */}
           <div className="w-full h-full relative">
-            {teacher.avatar_url
-              ? <img src={teacher.avatar_url} alt={teacher.full_name} className="block w-full h-full object-cover object-top" style={{ filter: 'contrast(1.06) saturate(1.06)', transform: 'translateZ(0)' }} />
+            {teacher.avatar_url && !avatarFailed
+              ? <img src={teacher.avatar_url} alt={teacher.full_name} decoding="async" onError={() => setAvatarFailed(true)} className="block w-full h-full object-cover object-top" style={{ filter: 'contrast(1.06) saturate(1.06)', transform: 'translateZ(0)' }} />
               : <div className="w-full h-full flex items-center justify-center" style={{ background: cfg.badgeBg }}>
                   <span className={cn('font-black text-gray-400', isFirst ? 'text-3xl sm:text-5xl' : 'text-2xl sm:text-3xl')}>{initials(teacher.full_name)}</span>
                 </div>
@@ -506,7 +492,7 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
 
           {/* Score badge — overlaid bottom-center of image */}
           <div className={cn(
-            "absolute bottom-3 left-1/2 -translate-x-1/2 z-20 rounded-full font-black tracking-[0.06em] flex items-center gap-1.5 px-4 py-1.5 backdrop-blur-2xl overflow-hidden",
+            "podium-score absolute bottom-3 left-1/2 -translate-x-1/2 z-20 rounded-full font-black tracking-[0.06em] flex items-center gap-1.5 px-4 py-1.5 backdrop-blur-2xl overflow-hidden",
             isFirst ? "text-[12px] sm:text-[14px]" : "text-[10px] sm:text-[12px]"
           )}
             style={{
@@ -525,15 +511,15 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
             <span className="absolute -right-4 bottom-[-35%] h-[90%] w-[46%] rounded-full bg-cyan-100/36 blur-[8px]" />
             <span className="absolute inset-x-2 bottom-1 h-px bg-gradient-to-r from-transparent via-cyan-50/80 to-transparent" />
             <Trophy className={cn("relative z-10 w-3.5 h-3.5 sm:w-4 sm:h-4", "text-yellow-500 fill-yellow-500 drop-shadow-[0_1px_4px_rgba(245,158,11,0.45)]")} />
-            <span className="relative z-10 leading-none drop-shadow-[0_1px_0_rgba(255,255,255,0.7)]">
-              {displayScore.toFixed(2)}%
+            <span ref={scoreEl} className="relative z-10 leading-none drop-shadow-[0_1px_0_rgba(255,255,255,0.7)]">
+              0.00%
             </span>
           </div>
           </div>
         </div>
 
         {/* Caption — white bottom section */}
-        <div className="relative z-40 mx-3 mb-3 mt-2 rounded-[18px] sm:rounded-[22px] px-2 sm:px-3 py-3 sm:py-4 flex flex-col items-center justify-center gap-1.5 overflow-hidden"
+        <div className="podium-caption relative z-40 mx-3 mb-3 mt-2 rounded-[18px] sm:rounded-[22px] px-2 sm:px-3 py-3 sm:py-4 flex flex-col items-center justify-center gap-1.5 overflow-hidden"
           style={{
             background: cfg.captionBg,
             border: `1px solid ${cfg.captionBorder}`,
@@ -545,7 +531,7 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
           <div className="absolute -bottom-4 left-[10%] right-[10%] h-6 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(69,10,10,0.28),transparent_72%)] blur-md pointer-events-none" style={{ animation: 'raised-info-glow 4.8s ease-in-out infinite' }} />
           <div className="absolute inset-x-4 top-1 h-[32%] rounded-full bg-white/46 blur-[8px]" />
           <div className="absolute top-0 left-8 right-8 h-px" style={{ background: cfg.accentLine }} />
-          <h4 className="relative w-full font-black leading-tight tracking-tight text-center"
+          <h4 className="podium-teacher-name relative w-full font-black leading-tight tracking-tight text-center"
             style={{
               color: cfg.textColor,
               fontSize: nameFontSize,
@@ -556,13 +542,13 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
             }}>
             {teacher.full_name}
           </h4>
-          <div className="relative inline-flex max-w-full items-center justify-center px-3 py-1 rounded-full border border-gray-200 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-xl overflow-hidden"
+          <div className="podium-center-badge relative inline-flex max-w-full items-center justify-center px-3 py-1 rounded-full border border-gray-200 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-xl overflow-hidden"
             style={{
               border: cfg.badgeBorder,
               background: cfg.badgeBg,
             }}>
             <span className="absolute inset-x-2 top-0 h-1/2 rounded-full bg-white/42 blur-[3px]" />
-            <p className="font-bold text-center leading-snug"
+            <p className="podium-center-name font-bold text-center leading-snug"
               style={{
                 color: cfg.subTextColor,
                 fontSize: centerFontSize,
@@ -577,12 +563,6 @@ const PodiumCard = memo(function PodiumCard({ teacher, idx, animCls, triggerAnim
             </p>
           </div>
         </div>
-
-        {sparkles.map(s => (
-          <div key={s.id} className="absolute pointer-events-none z-30" style={{ left: s.x, top: s.y, animation: 'sparkle-pop 0.7s ease-out forwards' }}>
-            <Star className="w-3 h-3 text-white fill-white/80 -translate-x-1/2 -translate-y-1/2" />
-          </div>
-        ))}
       </div>
     </div>
   )
@@ -597,6 +577,7 @@ interface PopupUIProps {
   podium: { teacher_code: string; full_name: string; center: string; total_score: number; avatar_url: string | null; rank: number }[]
   onClose: () => void
   activeConfetti: boolean
+  performanceMode: boolean
 }
 
 type PopupPanel = 'honors' | 'feature'
@@ -644,7 +625,25 @@ function MascotFeaturePanel({ onExplore }: { onExplore: () => void }) {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="mt-5 grid grid-cols-3 gap-1.5 sm:hidden">
+            {[
+              { icon: Shirt, shortTitle: 'Chọn áo', title: 'Chọn áo đội tuyển', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
+              { icon: Eye, shortTitle: 'Preview', title: 'Xem preview trước', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+              { icon: Save, shortTitle: 'Lưu ngay', title: 'Lưu và dùng ngay', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+            ].map(({ icon: Icon, shortTitle, title, color, bg, border }) => (
+              <div
+                key={title}
+                className={`flex min-w-0 items-center justify-center gap-1.5 rounded-full border ${border} ${bg} px-2 py-2 shadow-sm`}
+                aria-label={title}
+                title={title}
+              >
+                <Icon className={`h-4 w-4 shrink-0 ${color}`} strokeWidth={2.5} />
+                <span className="min-w-0 truncate text-[11px] font-black leading-none text-slate-900">{shortTitle}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 hidden gap-3 sm:grid sm:grid-cols-3">
             {[
               { icon: Shirt, title: 'Chọn áo đội tuyển', body: 'Bấm vào bé Mai ở góc phải để mở tủ đồ và chọn bộ theo quốc gia bạn thích.', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
               { icon: Eye, title: 'Xem preview trước', body: 'Animation chạy ngay trong modal để bạn biết bộ nào hợp nhất trước khi lưu.', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
@@ -676,7 +675,7 @@ function MascotFeaturePanel({ onExplore }: { onExplore: () => void }) {
   )
 }
 
-function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfetti }: PopupUIProps) {
+function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfetti, performanceMode }: PopupUIProps) {
   const [activePanel, setActivePanel] = useState<PopupPanel>('honors')
   const [panelDirection, setPanelDirection] = useState<'next' | 'prev'>('next')
 
@@ -686,12 +685,22 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
       setActivePanel('honors')
       return
     }
-    const timer = window.setInterval(() => {
-      const nextPanel = activePanel === 'honors' ? 'feature' : 'honors'
-      setPanelDirection(nextPanel === 'feature' ? 'next' : 'prev')
-      setActivePanel(nextPanel)
-    }, 5000)
-    return () => window.clearInterval(timer)
+    let timer: number | undefined
+    const scheduleNextPanel = () => {
+      if (timer) window.clearTimeout(timer)
+      if (document.hidden) return
+      timer = window.setTimeout(() => {
+        const nextPanel = activePanel === 'honors' ? 'feature' : 'honors'
+        setPanelDirection(nextPanel === 'feature' ? 'next' : 'prev')
+        setActivePanel(nextPanel)
+      }, 5000)
+    }
+    scheduleNextPanel()
+    document.addEventListener('visibilitychange', scheduleNextPanel)
+    return () => {
+      if (timer) window.clearTimeout(timer)
+      document.removeEventListener('visibilitychange', scheduleNextPanel)
+    }
   }, [showCard, contentPhase, activePanel])
 
   const handleExploreMascotOutfits = useCallback(() => {
@@ -714,6 +723,18 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
   return (
     <div className="fixed inset-0 z-[58] flex items-center justify-center p-2 sm:p-4 pointer-events-none select-none">
       <style>{`
+        @keyframes honors-confetti-fall {
+          0% {
+            opacity: 0;
+            transform: translate3d(0, -12dvh, 0) rotate(0deg);
+          }
+          8% { opacity: 0.95; }
+          82% { opacity: 0.9; }
+          100% {
+            opacity: 0;
+            transform: translate3d(var(--confetti-drift), 112dvh, 0) rotate(var(--confetti-rotation));
+          }
+        }
         @keyframes shimmer-sweep { 0% { transform:translateX(-120%) skewX(-18deg); } 100% { transform:translateX(320%) skewX(-18deg); } }
         @keyframes ring-expand { 0% { transform:scale(0.2); opacity:1; } 100% { transform:scale(3.2); opacity:0; } }
         @keyframes crown-bob { 0%,100% { transform:translateY(0) rotate(-4deg) scale(1); } 50% { transform:translateY(-6px) rotate(4deg) scale(1.05); } }
@@ -779,11 +800,38 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
         .anim-slide-right { animation: card-slide-right 0.6s cubic-bezier(0.34,1.25,0.64,1) 0.4s both; }
         .anim-title-reveal { animation: title-reveal 0.55s cubic-bezier(0.34,1.2,0.64,1) 0.1s both; }
 
+        .honors-confetti {
+          contain: strict;
+          transform: translateZ(0);
+        }
+        .honors-confetti-piece {
+          position: absolute;
+          top: 0;
+          left: var(--confetti-left);
+          width: var(--confetti-size);
+          height: calc(var(--confetti-size) * 1.55);
+          border-radius: 1px;
+          background: var(--confetti-color);
+          box-shadow: 0 0 5px color-mix(in srgb, var(--confetti-color) 65%, transparent);
+          opacity: 0;
+          animation: honors-confetti-fall var(--confetti-duration) linear var(--confetti-delay) infinite;
+        }
+        .honors-confetti-piece.is-diamond {
+          height: var(--confetti-size);
+          border-radius: 2px;
+          clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+        }
+        .honors-confetti-piece.is-star {
+          width: calc(var(--confetti-size) * 1.35);
+          height: calc(var(--confetti-size) * 1.35);
+          clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 94%, 50% 72%, 21% 94%, 32% 57%, 2% 35%, 39% 35%);
+        }
         .honors-popup-card {
           width: min(980px, calc(100vw - 1rem));
           height: min(720px, calc(100dvh - 1rem));
           max-height: calc(100dvh - 1rem);
           scrollbar-gutter: stable both-edges;
+          container-type: size;
         }
         .honors-stage {
           --panel-enter-x: 0.7rem;
@@ -810,12 +858,11 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
           pointer-events: none;
           transform: translate3d(var(--panel-exit-x), -0.25rem, 0) scale(0.992);
           transform-origin: 50% 52%;
-          filter: blur(8px) saturate(0.9);
           transition:
             opacity 900ms cubic-bezier(0.22, 1, 0.36, 1),
             transform 980ms cubic-bezier(0.16, 1, 0.3, 1),
-            filter 880ms cubic-bezier(0.22, 1, 0.36, 1);
-          will-change: opacity, transform, filter;
+            visibility 0s linear 980ms;
+          will-change: opacity, transform;
           backface-visibility: hidden;
         }
         .honors-swap-panel.is-active {
@@ -823,19 +870,86 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
           opacity: 1;
           pointer-events: auto;
           transform: translate3d(0, 0, 0) scale(1);
-          filter: blur(0) saturate(1);
-          animation: honors-panel-fade-in 980ms cubic-bezier(0.16, 1, 0.3, 1) both;
+          visibility: visible;
+          transition:
+            opacity 900ms cubic-bezier(0.22, 1, 0.36, 1),
+            transform 980ms cubic-bezier(0.16, 1, 0.3, 1),
+            visibility 0s linear 0s;
         }
         .honors-swap-panel.is-inactive {
           z-index: 1;
+          visibility: hidden;
+        }
+        .honors-swap-panel.is-inactive *,
+        .honors-swap-panel.is-inactive *::before,
+        .honors-swap-panel.is-inactive *::after {
+          animation-play-state: paused !important;
         }
         @media (prefers-reduced-motion: reduce) {
+          .honors-confetti {
+            display: none;
+          }
           .honors-swap-panel {
             animation: none !important;
             transition: opacity 180ms ease;
             transform: none !important;
             filter: none !important;
           }
+        }
+        @media (max-width: 767px), (pointer: coarse) {
+          .honors-confetti-piece:nth-child(n + 27) {
+            display: none;
+          }
+          .honors-confetti-piece {
+            box-shadow: none;
+          }
+          .honors-popup-overlay {
+            -webkit-backdrop-filter: none !important;
+            backdrop-filter: none !important;
+          }
+          .honors-popup-card,
+          .honors-popup-card * {
+            -webkit-backdrop-filter: none !important;
+            backdrop-filter: none !important;
+          }
+          .honors-popup-card [style*="infinite"] {
+            animation: none !important;
+          }
+          .honors-swap-panel {
+            transition-duration: 240ms;
+          }
+          .honors-swap-panel.is-active {
+            animation: none;
+          }
+          .honors-mobile-heavy-effect {
+            display: none;
+          }
+        }
+        .honors-popup-card.is-performance-mode [style*="infinite"] {
+          animation: none !important;
+        }
+        .honors-popup-card.is-performance-mode .honors-mobile-heavy-effect {
+          display: none;
+        }
+        .honors-popup-card.is-performance-mode .honors-confetti-piece:nth-child(n + 19) {
+          display: none;
+        }
+        .honors-popup-card.is-performance-mode .podium-card-shell,
+        .honors-popup-card.is-performance-mode .podium-score,
+        .honors-popup-card.is-performance-mode .podium-caption,
+        .honors-popup-card.is-performance-mode .podium-center-badge,
+        .honors-popup-card.is-performance-mode .honors-eyebrow,
+        .honors-popup-card.is-performance-mode .honors-footer-ribbon-inner,
+        .honors-popup-card.is-performance-mode .honors-pagination-shell {
+          -webkit-backdrop-filter: none !important;
+          backdrop-filter: none !important;
+        }
+        .honors-popup-card.is-performance-mode .podium-card-shell {
+          will-change: auto !important;
+        }
+        .honors-popup-card.is-performance-mode .podium-avatar,
+        .honors-popup-card.is-performance-mode .podium-caption {
+          transform: none !important;
         }
         .honors-content-panel {
           bottom: clamp(4.25rem, 8dvh, 5rem);
@@ -945,6 +1059,10 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
           width: 100%;
           max-height: 100%;
         }
+        .podium-card-wrap {
+          container-type: inline-size;
+          min-width: 0;
+        }
         .honors-footer-ribbon {
           padding-bottom: clamp(1.15rem, 2.8dvh, 1.9rem);
         }
@@ -998,6 +1116,247 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
           .card-podium-3 {
             width: clamp(168px, 22dvw, 218px);
             height: clamp(258px, 44dvh, 360px);
+          }
+        }
+        @media (max-width: 639px) {
+          .honors-popup-card {
+            width: calc(100vw - 0.5rem);
+            height: min(82dvh, 680px);
+            max-height: calc(100dvh - 0.75rem);
+            border-radius: 1.25rem;
+          }
+          .honors-stage {
+            padding-bottom: 3rem;
+          }
+          .honors-content-panel {
+            inset-inline: 0.6rem !important;
+            top: 0.8rem !important;
+            bottom: 3.25rem;
+          }
+          .honors-title {
+            margin-bottom: clamp(0.35rem, 1.2dvh, 0.7rem);
+            padding-inline: 2.4rem;
+          }
+          .honors-title > div:first-child {
+            max-width: 100%;
+            margin-bottom: clamp(0.45rem, 1.1dvh, 0.7rem) !important;
+            padding: 0.42rem 0.75rem !important;
+          }
+          .honors-title > div:first-child span {
+            font-size: clamp(0.44rem, 2.2vw, 0.62rem) !important;
+            letter-spacing: 0.12em !important;
+          }
+          .honors-title > div:first-child svg {
+            width: 0.7rem;
+            height: 0.7rem;
+            flex: 0 0 auto;
+          }
+          .honors-title h1 {
+            max-width: 30rem;
+            margin-bottom: 0.45rem;
+            font-size: clamp(1.22rem, 6.3vw, 2rem);
+            line-height: 1;
+          }
+          .honors-title .honors-subtitle {
+            max-width: 31rem;
+            font-size: clamp(0.52rem, 2.55vw, 0.72rem);
+            line-height: 1.35;
+            letter-spacing: 0.08em;
+            text-wrap: balance;
+          }
+          .honors-podium {
+            flex: 0 0 auto;
+            align-items: flex-start;
+            margin-top: 0.2rem;
+            margin-bottom: 0.3rem;
+          }
+          .honors-podium-track {
+            gap: clamp(0.25rem, 1.4vw, 0.55rem) !important;
+            padding-inline: 0.2rem !important;
+          }
+          .card-podium-1 {
+            width: 36%;
+            height: clamp(205px, 35dvh, 300px);
+          }
+          .card-podium-2 {
+            width: 31.5%;
+            height: clamp(184px, 31dvh, 268px);
+          }
+          .card-podium-3 {
+            width: 29%;
+            height: clamp(174px, 29dvh, 250px);
+          }
+          .podium-rank-label {
+            min-height: 1.15rem;
+            margin-bottom: 0.3rem !important;
+            gap: 0.25rem;
+          }
+          .podium-rank-label span {
+            font-size: clamp(0.52rem, 5.6cqw, 0.78rem) !important;
+            letter-spacing: 0.1em !important;
+            white-space: nowrap;
+          }
+          .podium-rank-label svg {
+            width: clamp(0.7rem, 8cqw, 1rem) !important;
+            height: clamp(0.7rem, 8cqw, 1rem) !important;
+          }
+          .podium-card-shell {
+            border-radius: clamp(1rem, 10cqw, 1.45rem) !important;
+          }
+          .podium-avatar {
+            flex: 0 1 auto !important;
+            height: calc(100% - clamp(3.8rem, 9.5dvh, 5.4rem) - 1.15rem);
+            min-height: 0;
+            margin: 0.35rem 0.35rem 0 !important;
+            border-radius: clamp(0.85rem, 9cqw, 1.2rem) !important;
+          }
+          .podium-avatar > div:last-child {
+            border-radius: inherit !important;
+          }
+          .podium-score {
+            bottom: 0.45rem !important;
+            max-width: calc(100% - 0.7rem);
+            gap: 0.22rem !important;
+            padding: 0.32rem clamp(0.45rem, 6cqw, 0.75rem) !important;
+            font-size: clamp(0.58rem, 7cqw, 0.82rem) !important;
+            white-space: nowrap;
+          }
+          .podium-score svg {
+            width: clamp(0.7rem, 8cqw, 0.95rem) !important;
+            height: clamp(0.7rem, 8cqw, 0.95rem) !important;
+          }
+          .podium-caption {
+            min-height: 0;
+            height: clamp(3.5rem, 8dvh, 4.6rem);
+            flex: 0 0 auto;
+            margin: 0.4rem 0.4rem 0.4rem !important;
+            padding: 0.38rem 0.35rem !important;
+            gap: 0.32rem !important;
+            border-radius: clamp(0.8rem, 9cqw, 1.1rem) !important;
+          }
+          .podium-teacher-name {
+            font-size: clamp(0.66rem, 8.5cqw, 1rem) !important;
+            line-height: 1.08 !important;
+            overflow-wrap: anywhere;
+          }
+          .podium-center-badge {
+            max-width: calc(100% - 0.2rem);
+            padding: 0.28rem clamp(0.35rem, 5cqw, 0.65rem) !important;
+          }
+          .podium-center-name {
+            max-width: 100%;
+            font-size: clamp(0.5rem, 6.3cqw, 0.72rem) !important;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+          }
+          .honors-footer-ribbon {
+            margin-top: auto;
+            padding-bottom: 0.15rem;
+          }
+          .honors-footer-ribbon-inner {
+            max-width: calc(100% - 4.5rem) !important;
+            padding: 0.4rem 0.75rem !important;
+          }
+          .honors-footer-ribbon-inner span {
+            flex: 1 1 auto;
+            text-align: center;
+            font-size: clamp(0.44rem, 2.25vw, 0.62rem) !important;
+            line-height: 1.2;
+            text-wrap: balance;
+          }
+          .honors-pagination {
+            right: 0.7rem;
+            bottom: 0.55rem;
+          }
+          .honors-close-button {
+            top: 0.55rem !important;
+            right: 0.55rem !important;
+            width: 2rem !important;
+            height: 2rem !important;
+          }
+          .honors-panel-navigation {
+            align-items: flex-end !important;
+            padding: 0 0.45rem 2.7rem !important;
+          }
+          .honors-panel-arrow {
+            width: 2rem !important;
+            height: 2rem !important;
+            background: rgba(38, 6, 8, 0.52) !important;
+          }
+          .honors-panel-arrow svg {
+            width: 1rem;
+            height: 1rem;
+          }
+        }
+        @media (max-width: 390px) {
+          .honors-popup-card {
+            height: min(80dvh, 630px);
+          }
+          .honors-title {
+            padding-inline: 1.9rem;
+          }
+          .honors-title > div:first-child svg:last-child {
+            display: none;
+          }
+          .honors-title h1 {
+            font-size: clamp(1.08rem, 6vw, 1.45rem);
+          }
+          .honors-title .honors-subtitle {
+            font-size: clamp(0.48rem, 2.45vw, 0.61rem);
+          }
+          .honors-podium-track {
+            gap: 0.2rem !important;
+          }
+          .card-podium-1 {
+            width: 37%;
+          }
+          .card-podium-2 {
+            width: 31%;
+          }
+          .card-podium-3 {
+            width: 29%;
+          }
+          .podium-caption {
+            margin-inline: 0.3rem !important;
+            height: 3.45rem;
+          }
+        }
+        @media (max-height: 760px) and (max-width: 767px) {
+          .honors-popup-card {
+            height: min(86dvh, 610px);
+          }
+          .honors-content-panel {
+            top: 0.55rem !important;
+          }
+          .honors-title > div:first-child {
+            margin-bottom: 0.35rem !important;
+            padding-block: 0.3rem !important;
+          }
+          .honors-title h1 {
+            margin-bottom: 0.25rem;
+            font-size: clamp(1.05rem, 5.4vw, 1.55rem);
+          }
+          .honors-title .honors-subtitle {
+            font-size: clamp(0.46rem, 2.25vw, 0.6rem);
+          }
+          .honors-podium {
+            margin-block: 0.15rem 0.25rem;
+          }
+          .card-podium-1 {
+            height: clamp(195px, 36dvh, 270px);
+          }
+          .card-podium-2 {
+            height: clamp(176px, 32dvh, 242px);
+          }
+          .card-podium-3 {
+            height: clamp(166px, 30dvh, 226px);
+          }
+          .podium-caption {
+            height: 3.45rem;
+            padding-block: 0.38rem !important;
+          }
+          .honors-footer-ribbon {
+            padding-bottom: 0.25rem;
           }
         }
         @media (max-height: 680px) {
@@ -1073,18 +1432,167 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
             height: clamp(166px, 37dvh, 226px);
           }
         }
+        @media (max-height: 520px) and (orientation: landscape) {
+          .honors-content-panel {
+            top: 0.35rem !important;
+            bottom: 2.9rem;
+          }
+          .honors-stage {
+            padding-bottom: 2.7rem;
+          }
+          .honors-eyebrow,
+          .honors-title .honors-subtitle,
+          .honors-footer-ribbon {
+            display: none;
+          }
+          .honors-title {
+            margin-bottom: 0.1rem;
+          }
+          .honors-title h1 {
+            margin-bottom: 0;
+            font-size: clamp(1rem, 3.2vw, 1.65rem);
+          }
+          .honors-podium {
+            margin-block: 0.1rem;
+          }
+          .card-podium-1 {
+            height: min(72dvh, 330px);
+          }
+          .card-podium-2 {
+            height: min(65dvh, 295px);
+          }
+          .card-podium-3 {
+            height: min(60dvh, 270px);
+          }
+          .podium-caption {
+            min-height: 3.25rem;
+            margin-block: 0.25rem !important;
+            padding-block: 0.25rem !important;
+          }
+          .honors-panel-navigation {
+            align-items: center !important;
+            padding: 0 0.35rem !important;
+          }
+        }
+        /*
+         * Final portrait-mobile contract.
+         * Keep this block after height-based queries so short screens cannot
+         * accidentally restore the old portrait card heights.
+         */
+        @media (max-width: 639px) and (orientation: portrait) {
+          .honors-popup-card {
+            height: min(84dvh, 680px);
+          }
+          .honors-content-panel {
+            top: 0.65rem !important;
+            bottom: 3.2rem;
+          }
+          .honors-title {
+            margin-bottom: 0.3rem;
+          }
+          .honors-podium {
+            flex: 1 1 auto;
+            min-height: 0;
+            align-items: center;
+            justify-content: center;
+            margin-block: 0.2rem;
+          }
+          .honors-podium-track {
+            align-items: flex-end;
+            margin-block: auto;
+            gap: clamp(0.18rem, 1.1vw, 0.42rem) !important;
+            padding-inline: 0.1rem !important;
+          }
+          .card-podium-1,
+          .card-podium-2,
+          .card-podium-3 {
+            height: auto !important;
+            align-self: flex-end;
+          }
+          .card-podium-1 {
+            width: 36%;
+          }
+          .card-podium-2 {
+            width: 31.5%;
+          }
+          .card-podium-3 {
+            width: 29%;
+          }
+          .podium-rank-label {
+            min-height: 1rem;
+            margin-bottom: 0.2rem !important;
+          }
+          .podium-card-shell {
+            display: grid !important;
+            grid-template-rows: auto auto;
+            height: auto !important;
+            flex: 0 0 auto !important;
+          }
+          .podium-avatar {
+            width: calc(100% - 0.6rem);
+            height: auto !important;
+            min-height: 0 !important;
+            /* 3× the previous 16:9 height: width × 27/16 */
+            aspect-ratio: 16 / 27 !important;
+            flex: 0 0 auto !important;
+            margin: 0.3rem 0.3rem 0 !important;
+          }
+          .podium-score {
+            bottom: 0.28rem !important;
+            padding-block: 0.24rem !important;
+          }
+          .podium-caption {
+            display: grid !important;
+            grid-template-rows: minmax(2.2em, auto) auto;
+            align-content: center;
+            justify-items: center;
+            width: calc(100% - 0.6rem);
+            height: auto !important;
+            min-height: 4.35rem !important;
+            margin: 0.32rem 0.3rem 0.3rem !important;
+            padding: 0.42rem 0.32rem !important;
+            gap: 0.28rem !important;
+            overflow: hidden;
+          }
+          .podium-teacher-name {
+            min-height: 2.2em;
+            max-height: 2.2em;
+            font-size: clamp(0.64rem, 8.2cqw, 0.92rem) !important;
+            line-height: 1.1 !important;
+            text-wrap: balance;
+          }
+          .podium-center-badge {
+            width: min(100%, 9.5rem);
+            min-width: 0;
+            padding: 0.24rem clamp(0.3rem, 4.5cqw, 0.58rem) !important;
+          }
+          .podium-center-name {
+            width: 100%;
+            min-width: 0;
+            font-size: clamp(0.48rem, 6cqw, 0.68rem) !important;
+            line-height: 1.15 !important;
+          }
+          .honors-footer-ribbon {
+            margin-top: 0;
+            flex: 0 0 auto;
+          }
+        }
       `}</style>
 
        <div
          ref={cardRef}
-         className={cn('honors-popup-card relative pointer-events-auto overflow-hidden rounded-[1.35rem] sm:rounded-[2rem] transition-opacity duration-300', showCard ? 'opacity-100' : 'opacity-0 pointer-events-none')}
+         className={cn(
+           'honors-popup-card relative pointer-events-auto overflow-hidden rounded-[1.35rem] sm:rounded-[2rem] transition-opacity duration-300',
+           showCard ? 'opacity-100' : 'opacity-0 pointer-events-none',
+           performanceMode && 'is-performance-mode',
+         )}
          style={{
            background: 'linear-gradient(135deg, #8f101f 0%, #c21c27 34%, #e43728 58%, #9b1219 100%)',
            boxShadow: '0 38px 96px -22px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.18), inset 0 1px 0 rgba(255,255,255,0.28)',
            transform: 'translateZ(0)',
          }}
        >
-        <ConfettiRain active={activeConfetti} />
+        <ConfettiRain active={activeConfetti && activePanel === 'honors'} />
         <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-[1.35rem] sm:rounded-[2rem]">
 
           {/* ── Velvet stage depth ── */}
@@ -1125,20 +1633,20 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
               backgroundRepeat: 'no-repeat',
               animation: 'stage-wave-cross-c 26s ease-in-out infinite reverse',
             }} />
-          <div className="absolute -left-[22%] top-[25%] h-[28%] w-[126%] opacity-34 mix-blend-screen blur-[12px]"
+          <div className="honors-mobile-heavy-effect absolute -left-[22%] top-[25%] h-[28%] w-[126%] opacity-34 mix-blend-screen blur-[12px]"
             style={{
               background: 'linear-gradient(96deg, transparent 0%, rgba(255,124,90,0.12) 24%, rgba(255,255,255,0.16) 45%, rgba(255,190,120,0.14) 62%, transparent 100%)',
               animation: 'stage-wave-glow 16s ease-in-out infinite',
             }} />
 
           {/* ── Award ribbons and stage lights ── */}
-          <div className="absolute -left-[18%] top-[12%] h-[26%] w-[136%] opacity-45 blur-[18px]"
+          <div className="honors-mobile-heavy-effect absolute -left-[18%] top-[12%] h-[26%] w-[136%] opacity-45 blur-[18px]"
             style={{ background: 'linear-gradient(96deg, transparent 0%, rgba(255,236,170,0.18) 26%, rgba(255,255,255,0.18) 50%, rgba(255,185,80,0.16) 74%, transparent 100%)', animation: 'ribbon-flow 14s ease-in-out infinite' }} />
-          <div className="absolute -left-[24%] bottom-[9%] h-[22%] w-[150%] opacity-36 blur-[22px]"
+          <div className="honors-mobile-heavy-effect absolute -left-[24%] bottom-[9%] h-[22%] w-[150%] opacity-36 blur-[22px]"
             style={{ background: 'linear-gradient(84deg, transparent 0%, rgba(255,255,255,0.14) 30%, rgba(255,213,104,0.18) 50%, rgba(255,255,255,0.11) 68%, transparent 100%)', animation: 'ribbon-flow 18s ease-in-out infinite reverse' }} />
-          <div className="absolute top-[-25%] left-[12%] h-[145%] w-[18%] origin-top blur-[24px]"
+          <div className="honors-mobile-heavy-effect absolute top-[-25%] left-[12%] h-[145%] w-[18%] origin-top blur-[24px]"
             style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,221,120,0.13) 44%, transparent 82%)', animation: 'light-sweep 11s ease-in-out infinite' }} />
-          <div className="absolute top-[-25%] right-[14%] h-[145%] w-[20%] origin-top blur-[28px]"
+          <div className="honors-mobile-heavy-effect absolute top-[-25%] right-[14%] h-[145%] w-[20%] origin-top blur-[28px]"
             style={{ background: 'linear-gradient(180deg, rgba(255,239,192,0.24), rgba(255,255,255,0.1) 46%, transparent 84%)', animation: 'light-sweep 13s ease-in-out infinite reverse' }} />
 
           {/* ── Ripple rings emanating from center ── */}
@@ -1162,14 +1670,14 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full border border-white/30" style={{ animation: 'ring-expand 1.3s ease-out 0.05s both' }} />
           </div>
         )}
-         <button onClick={onClose} className="absolute top-2.5 right-2.5 sm:top-4 sm:right-4 z-40 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group transition-all duration-200 hover:scale-110" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.16), rgba(69,10,10,0.32))', border: '1px solid rgba(255, 255, 255, 0.48)', backdropFilter: 'blur(12px) saturate(1.4)', boxShadow: '0 10px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.34)' }} aria-label="Đóng">
+         <button onClick={onClose} className="honors-close-button absolute top-2.5 right-2.5 sm:top-4 sm:right-4 z-40 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center group transition-all duration-200 hover:scale-110" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.16), rgba(69,10,10,0.32))', border: '1px solid rgba(255, 255, 255, 0.48)', backdropFilter: 'blur(12px) saturate(1.4)', boxShadow: '0 10px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.34)' }} aria-label="Đóng">
            <X className="w-4 h-4 text-white/80 group-hover:text-white group-hover:rotate-90 transition-all duration-300" />
          </button>
-         <div className="absolute inset-y-0 left-0 right-0 z-30 pointer-events-none flex items-center justify-between px-2 sm:px-4">
+         <div className="honors-panel-navigation absolute inset-y-0 left-0 right-0 z-30 pointer-events-none flex items-center justify-between px-2 sm:px-4">
            <button
              type="button"
              onClick={togglePanel}
-             className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-white/45 bg-black/25 text-white shadow-lg backdrop-blur-md transition hover:scale-110 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 sm:h-10 sm:w-10"
+             className="honors-panel-arrow pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-white/45 bg-black/25 text-white shadow-lg backdrop-blur-md transition hover:scale-110 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 sm:h-10 sm:w-10"
              aria-label="Quay lại popup trước"
            >
              <ChevronLeft className="h-5 w-5" strokeWidth={2.6} />
@@ -1177,7 +1685,7 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
            <button
              type="button"
              onClick={togglePanel}
-             className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-white/45 bg-black/25 text-white shadow-lg backdrop-blur-md transition hover:scale-110 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 sm:h-10 sm:w-10"
+             className="honors-panel-arrow pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full border border-white/45 bg-black/25 text-white shadow-lg backdrop-blur-md transition hover:scale-110 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 sm:h-10 sm:w-10"
              aria-label="Đi tới popup tiếp theo"
            >
              <ChevronRight className="h-5 w-5" strokeWidth={2.6} />
@@ -1200,7 +1708,7 @@ function PopupUI({ cardRef, showCard, contentPhase, podium, onClose, activeConfe
          <div className={cn('honors-stage relative z-10 px-3 pt-5 sm:px-5 sm:pt-7 md:px-10', panelDirection === 'next' ? 'is-moving-next' : 'is-moving-prev')}>
            <div className={cn('honors-panel honors-content-panel honors-swap-panel absolute inset-x-3 top-5 sm:inset-x-5 sm:top-7 md:inset-x-10', activePanel === 'honors' ? 'is-active' : 'is-inactive')}>
            <div className={cn('honors-title text-center', contentPhase >= 1 ? 'anim-title-reveal' : 'opacity-0')}>
-             <div className="inline-flex max-w-[calc(100%-3rem)] items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-7 py-2 rounded-full mb-3 sm:mb-4 relative overflow-hidden"
+             <div className="honors-eyebrow inline-flex max-w-[calc(100%-3rem)] items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-7 py-2 rounded-full mb-3 sm:mb-4 relative overflow-hidden"
                style={{
                  background: 'linear-gradient(135deg, rgba(255,255,255,0.24) 0%, rgba(255,236,170,0.15) 44%, rgba(255,255,255,0.19) 100%)',
                  backdropFilter: 'blur(24px) saturate(1.6)',
@@ -1288,7 +1796,7 @@ function MascotOutfitFeatureModal({ open, onClose }: { open: boolean; onClose: (
         role="dialog"
         aria-modal="true"
         aria-label="Giới thiệu tính năng thay đổi trang phục mascot"
-        className="relative w-full max-w-[640px] overflow-hidden rounded-[1.6rem] border border-red-100 text-slate-900 shadow-[0_32px_90px_rgba(15,23,42,0.28)]"
+        className="relative w-full max-w-[640px] overflow-hidden rounded-[1.25rem] border border-red-100 text-slate-900 shadow-[0_32px_90px_rgba(15,23,42,0.28)] sm:rounded-[1.6rem]"
         style={{
           background: 'radial-gradient(circle at 15% 10%, rgba(254,226,226,0.95), transparent 32%), radial-gradient(circle at 86% 14%, rgba(220,252,231,0.9), transparent 28%), linear-gradient(135deg, #fffaf7 0%, #ffffff 46%, #fff1f2 100%)',
         }}
@@ -1312,30 +1820,48 @@ function MascotOutfitFeatureModal({ open, onClose }: { open: boolean; onClose: (
           <X className="h-4 w-4" />
         </button>
 
-        <div className="relative z-10 p-5 sm:p-7">
+        <div className="relative z-10 p-4 sm:p-7">
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-red-700">
             <Sparkles className="h-4 w-4" />
             Tính năng mới
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-[1fr_190px] sm:items-center">
+          <div className="grid gap-4 sm:grid-cols-[1fr_190px] sm:items-center sm:gap-5">
             <div>
-              <h2 className="text-2xl font-black leading-tight text-slate-950 sm:text-3xl">Thay đổi trang phục cho mascot bé Mai</h2>
-              <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+              <h2 className="pr-9 text-[1.35rem] font-black leading-tight text-slate-950 sm:pr-0 sm:text-3xl">Thay đổi trang phục cho mascot bé Mai</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600 sm:mt-3">
                 Bé Mai đã có tủ đồ World Cup: chọn outfit theo đội tuyển yêu thích, xem animation trong modal và lưu để mascot ngoài màn hình dùng ngay bộ trang phục mới.
               </p>
             </div>
 
-            <div className="relative mx-auto flex h-44 w-44 items-center justify-center">
+            <div className="relative mx-auto flex h-32 w-32 items-center justify-center sm:h-44 sm:w-44">
               <div className="absolute inset-0 rounded-full bg-yellow-300/30 blur-2xl" />
-              <div className="relative flex h-36 w-36 items-center justify-center rounded-full border border-yellow-200 bg-white shadow-[0_18px_45px_rgba(251,191,36,0.22)]">
-                <Trophy className="h-16 w-16 text-yellow-300 drop-shadow-[0_8px_22px_rgba(250,204,21,0.45)]" strokeWidth={2.2} />
+              <div className="relative flex h-28 w-28 items-center justify-center rounded-full border border-yellow-200 bg-white shadow-[0_18px_45px_rgba(251,191,36,0.22)] sm:h-36 sm:w-36">
+                <Trophy className="h-12 w-12 text-yellow-300 drop-shadow-[0_8px_22px_rgba(250,204,21,0.45)] sm:h-16 sm:w-16" strokeWidth={2.2} />
                 <span className="absolute -bottom-2 rounded-full bg-red-600 px-3 py-1 text-[11px] font-black text-white shadow">WC 2026</span>
               </div>
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="mt-5 grid grid-cols-3 gap-1.5 sm:hidden">
+            {[
+              { icon: Shirt, shortTitle: 'Chọn áo', title: 'Chọn áo đội tuyển', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
+              { icon: Eye, shortTitle: 'Preview', title: 'Xem preview trước', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+              { icon: Save, shortTitle: 'Lưu ngay', title: 'Lưu và dùng ngay', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+            ].map(({ icon: Icon, shortTitle, title, color, bg, border }) => (
+              <div
+                key={title}
+                className={`flex min-w-0 items-center justify-center gap-1.5 rounded-full border ${border} ${bg} px-2 py-2 shadow-sm`}
+                aria-label={title}
+                title={title}
+              >
+                <Icon className={`h-4 w-4 shrink-0 ${color}`} strokeWidth={2.5} />
+                <span className="min-w-0 truncate text-[11px] font-black leading-none text-slate-900">{shortTitle}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 hidden gap-3 sm:grid sm:grid-cols-3">
             {[
               { icon: Shirt, title: 'Chọn áo đội tuyển', body: 'Mở tủ đồ bằng cách bấm vào bé Mai ở góc phải và chọn bộ theo quốc gia bạn thích.', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
               { icon: Eye, title: 'Xem preview trước', body: 'Animation chạy ngay trong modal để bạn biết bộ nào hợp nhất.', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
@@ -1379,6 +1905,7 @@ interface TeacherHonorsPopupProps { isOpen: boolean; onOpen?: () => void; onClos
 
 export function TeacherHonorsPopup({ isOpen, onOpen, onClose }: TeacherHonorsPopupProps) {
   const [mounted, setMounted] = useState(false)
+  const [performanceMode, setPerformanceMode] = useState(false)
   const [renderCard, setRenderCard] = useState(false)
   const [showCard, setShowCard] = useState(false)
   const [contentPhase, setContentPhase] = useState(0)
@@ -1393,7 +1920,12 @@ export function TeacherHonorsPopup({ isOpen, onOpen, onClose }: TeacherHonorsPop
   const triggerCloseRef = useRef<(() => void) | null>(null)
 
   useEffect(() => { onCloseRef.current = onClose }, [onClose])
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+    setPerformanceMode(shouldReduceVisualEffects())
+  }, [])
+
+  const shouldUseLightweightMotion = useCallback(() => shouldReduceVisualEffects(), [])
 
   const getTabRect = useCallback((): Rect | null => {
     const el = document.getElementById('tab-vinh-danh'); if (!el) return null
@@ -1415,7 +1947,7 @@ export function TeacherHonorsPopup({ isOpen, onOpen, onClose }: TeacherHonorsPop
   const runOpen = useCallback((src: Rect, dst: Rect) => {
     const canvas = canvasRef.current; const overlay = overlayRef.current; if (!canvas) return
     resizeCanvas(); const ctx = canvas.getContext('2d')!
-    const TOTAL = 820; const PHASE1_END = 0.48; let start = -1; particlesRef.current = []
+    const TOTAL = 820; const PHASE1_END = 0.48; let start = -1; let hasRevealedCard = false; particlesRef.current = []
     const tick = (now: number) => {
       if (start < 0) start = now; const raw = Math.min((now - start) / TOTAL, 1)
       ctx.clearRect(0, 0, canvas.width, canvas.height)
@@ -1425,7 +1957,11 @@ export function TeacherHonorsPopup({ isOpen, onOpen, onClose }: TeacherHonorsPop
         paintGenie(ctx, src.x, src.y, src.w, src.h, dst.x, dst.y, dst.w, dst.h, topT, botT, shapeAlpha, false)
         if (p > 0.3 && p < 0.85 && Math.random() > 0.55) particlesRef.current.push(...spawnParticles(dst.x + dst.w / 2, src.y + (dst.y - src.y) * topT * 0.5, 3))
       }
-      if (raw > PHASE1_END * 0.9 && !showCard) { setShowCard(true); setContentPhase(3) }
+      if (raw > PHASE1_END * 0.9 && !hasRevealedCard) {
+        hasRevealedCard = true
+        setShowCard(true)
+        setContentPhase(3)
+      }
       particlesRef.current = particlesRef.current.filter(p => p.opacity > 0.02)
       for (const pt of particlesRef.current) {
         pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.12; pt.opacity -= pt.decay
@@ -1435,7 +1971,7 @@ export function TeacherHonorsPopup({ isOpen, onOpen, onClose }: TeacherHonorsPop
       else { canvas.style.opacity = '0'; animStateRef.current = 'idle' }
     }
     canvas.style.opacity = '1'; canvas.style.pointerEvents = 'none'; rafRef.current = requestAnimationFrame(tick)
-  }, [resizeCanvas, showCard])
+  }, [resizeCanvas])
 
   const runClose = useCallback((src: Rect, dst: Rect) => {
     const canvas = canvasRef.current; const overlay = overlayRef.current; if (!canvas) return
@@ -1454,8 +1990,17 @@ export function TeacherHonorsPopup({ isOpen, onOpen, onClose }: TeacherHonorsPop
   }, [resizeCanvas])
 
   const triggerOpen = useCallback(() => {
-    if (animStateRef.current === 'in') return
+    if (renderCard || animStateRef.current === 'in') return
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    if (shouldUseLightweightMotion()) {
+      animStateRef.current = 'idle'
+      setRenderCard(true)
+      requestAnimationFrame(() => {
+        setShowCard(true)
+        setContentPhase(3)
+      })
+      return
+    }
     const tabRect = getTabRect()
     if (tabRect) {
       animStateRef.current = 'in'; setShowCard(false); setContentPhase(0); setRenderCard(true)
@@ -1463,15 +2008,25 @@ export function TeacherHonorsPopup({ isOpen, onOpen, onClose }: TeacherHonorsPop
     } else {
       animStateRef.current = 'in'; setRenderCard(true); setTimeout(() => setShowCard(true), 10); setTimeout(() => setContentPhase(3), 440)
     }
-  }, [getTabRect, getCardRect, runOpen])
+  }, [getTabRect, getCardRect, renderCard, runOpen, shouldUseLightweightMotion])
 
   const triggerClose = useCallback(() => {
     if (animStateRef.current === 'out') return
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    if (shouldUseLightweightMotion()) {
+      animStateRef.current = 'idle'
+      setShowCard(false)
+      setContentPhase(0)
+      window.setTimeout(() => {
+        setRenderCard(false)
+        onCloseRef.current()
+      }, 180)
+      return
+    }
     const tabRect = getTabRect(); const cardRect = getCardRect()
     if (tabRect && cardRect) { animStateRef.current = 'out'; runClose({ x: cardRect.x, y: cardRect.y, w: cardRect.w, h: cardRect.h }, tabRect) }
     else { animStateRef.current = 'out'; setShowCard(false); setContentPhase(0); setTimeout(() => { setRenderCard(false); onCloseRef.current() }, 200) }
-  }, [getTabRect, getCardRect, runClose])
+  }, [getTabRect, getCardRect, runClose, shouldUseLightweightMotion])
 
   useEffect(() => { triggerOpenRef.current = triggerOpen; triggerCloseRef.current = triggerClose }, [triggerOpen, triggerClose])
   useEffect(() => { if (isOpen) triggerOpenRef.current?.(); else if (renderCard) triggerCloseRef.current?.() }, [isOpen, renderCard])
@@ -1486,17 +2041,36 @@ export function TeacherHonorsPopup({ isOpen, onOpen, onClose }: TeacherHonorsPop
   }, [renderCard])
 
   const { data } = useSWR<TopTeachersResponse>('/api/truyenthong/top-teachers', fetcher, { revalidateOnFocus: false, revalidateOnReconnect: false, dedupingInterval: 300_000 })
-  const teachers = data?.success && Array.isArray(data.data) ? data.data : []
-  const podium = [{ ...teachers[1], rank: 2 }, { ...teachers[0], rank: 1 }, { ...teachers[2], rank: 3 }].map((t, i) => ({
-    ...t, teacher_code: t?.teacher_code || `t${i}`, full_name: t?.full_name || ['Giáo viên Xuất Sắc', 'Ngôi Sao Đào Tạo', 'Nhà Giáo Tận Tâm'][i], center: t?.center || ['MindX HCM', 'MindX HN', 'MindX ĐN'][i], total_score: t?.total_score || [9.8, 9.5, 9.2][i], avatar_url: t?.avatar_url || null,
-  }))
+  const databaseTeachers = useMemo(
+    () => data?.success && Array.isArray(data.data) ? data.data : [],
+    [data],
+  )
+  const teachers = useMemo(
+    () => databaseTeachers.length > 0
+      ? Array.from({ length: 3 }, (_, index) => databaseTeachers[index] ?? MOCK_TOP_TEACHERS[index])
+      : MOCK_TOP_TEACHERS,
+    [databaseTeachers],
+  )
+  useEffect(() => {
+    teachers.slice(0, 3).forEach(teacher => {
+      if (!teacher.avatar_url) return
+      const image = new Image()
+      image.decoding = 'async'
+      image.src = teacher.avatar_url
+    })
+  }, [teachers])
+  const podium = useMemo(() => [
+    { ...teachers[1], rank: 2 },
+    { ...teachers[0], rank: 1 },
+    { ...teachers[2], rank: 3 },
+  ], [teachers])
 
   if (!mounted) return null
 
   return createPortal(
     <>
       <canvas ref={canvasRef} className="fixed inset-0 z-[60] pointer-events-none" style={{ opacity: 0, transition: 'opacity 0.15s' }} aria-hidden />
-      {renderCard && <div ref={overlayRef} className="fixed inset-0 z-[55] bg-black/40 backdrop-blur-sm" style={{ opacity: 0 }} onClick={triggerClose} />}
+      {renderCard && <div ref={overlayRef} className="honors-popup-overlay fixed inset-0 z-[55] bg-black/40 backdrop-blur-sm" style={{ opacity: 0 }} onClick={triggerClose} />}
       {renderCard && (
         <PopupUI
           cardRef={cardRef}
@@ -1505,6 +2079,7 @@ export function TeacherHonorsPopup({ isOpen, onOpen, onClose }: TeacherHonorsPop
           podium={podium}
           onClose={triggerClose}
           activeConfetti={showCard && contentPhase >= 3}
+          performanceMode={performanceMode}
         />
       )}
     </>,
