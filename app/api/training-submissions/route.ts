@@ -336,10 +336,10 @@ export async function POST(request: NextRequest) {
           ) VALUES ($1, $2, $3, $4, $5, 'Active', NOW(), NOW())
           ON CONFLICT (teacher_code) 
           DO UPDATE SET 
-            full_name = EXCLUDED.full_name,
-            center = EXCLUDED.center,
-            teaching_block = EXCLUDED.teaching_block,
-            work_email = EXCLUDED.work_email,
+            full_name = COALESCE(NULLIF(EXCLUDED.full_name, ''), training_teacher_stats.full_name),
+            center = COALESCE(NULLIF(EXCLUDED.center, ''), training_teacher_stats.center),
+            teaching_block = COALESCE(NULLIF(EXCLUDED.teaching_block, ''), training_teacher_stats.teaching_block),
+            work_email = COALESCE(NULLIF(EXCLUDED.work_email, ''), training_teacher_stats.work_email),
             updated_at = NOW()
         `, [
           canonicalCode,
