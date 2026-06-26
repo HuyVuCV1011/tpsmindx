@@ -49,7 +49,6 @@ interface Assignment {
   time_limit_minutes: number
   max_attempts: number
   due_date: string
-  status: string
   question_count: number
   video_completion_status?: string
   recent_submission?: {
@@ -387,18 +386,10 @@ export default function TeacherAssignmentPage() {
           return
         }
 
-        // Check required fields directly from profile
+        // Cơ sở chỉ là metadata để đồng bộ thống kê, không phải điều kiện làm bài.
+        // Một số hồ sơ cũ chỉ có branchIn, nên dùng làm fallback khi gửi lên API.
         const teacherBranch =
           teacherProfile.branchCurrent || teacherProfile.branchIn
-        // Note: teacherProfile.status might be mapped differently, but checking basic existence is safer
-        // We assume if profile loaded, it's good enough or we can check branch
-        if (!teacherBranch) {
-          toast.error(
-            'Thiếu thông tin Cơ sở (Branch). Vui lòng cập nhật thông tin.',
-          )
-          router.replace(pathname || '/user/dao-tao-nang-cao')
-          return
-        }
 
         // Fetch questions
         const questionsRes = await fetch(
@@ -423,7 +414,7 @@ export default function TeacherAssignmentPage() {
             attempt_number: 1,
             teacher_info: {
               full_name: teacherProfile?.name || teacherCode,
-              center: teacherProfile?.branchCurrent || '',
+              center: teacherBranch || '',
               teaching_block: teacherProfile?.programCurrent || '',
               work_email: user?.email || '',
             },
@@ -2848,11 +2839,9 @@ export default function TeacherAssignmentPage() {
                 <div className="bg-linear-to-br from-blue-500 to-blue-600 p-3 text-white">
                   <div className="flex items-start justify-between mb-1.5">
                     <BookOpen className="w-5 h-5 shrink-0" />
-                    {assignment.status === 'published' && (
-                      <span className="px-1.5 py-0.5 bg-white/20 rounded-full text-[10px] font-semibold">
-                        Mở
-                      </span>
-                    )}
+                    <span className="px-1.5 py-0.5 bg-white/20 rounded-full text-[10px] font-semibold">
+                      Mở
+                    </span>
                   </div>
                   <h3 className="text-sm font-bold mb-1 line-clamp-2 leading-tight">
                     {assignment.assignment_title}
@@ -2914,7 +2903,7 @@ export default function TeacherAssignmentPage() {
                         >
                           {assignment.recent_submission.score}
                           <span className="text-xs text-gray-500">
-                            /{assignment.total_points}
+                            /{assignment.total_points || 10}
                           </span>
                         </span>
                       </div>
@@ -2931,21 +2920,23 @@ export default function TeacherAssignmentPage() {
                       }
                       startAssignment(assignment);
                     }}
-                    disabled={assignment.status !== 'published'}
-                    className={`w-full py-2 text-sm font-semibold h-auto cursor-pointer disabled:cursor-not-allowed ${assignment.status === 'published'
-                        ? assignment.video_id && !['completed', 'watched'].includes(assignment.video_completion_status || '')
-                          ? 'bg-gray-400 text-white hover:bg-gray-500'
-                          : 'shadow-sm hover:shadow-md bg-[#a1001f] text-white hover:bg-[#840018]'
-                        : 'bg-gray-200 text-gray-500 hover:bg-gray-200'
-                      }`}
+                    className={`w-full py-2 text-sm font-semibold h-auto cursor-pointer ${
+                      assignment.video_id &&
+                      !['completed', 'watched'].includes(
+                        assignment.video_completion_status || '',
+                      )
+                        ? 'bg-gray-400 text-white hover:bg-gray-500'
+                        : 'shadow-sm hover:shadow-md bg-[#a1001f] text-white hover:bg-[#840018]'
+                    }`}
                   >
-                    {assignment.status === 'published'
-                      ? assignment.video_id && !['completed', 'watched'].includes(assignment.video_completion_status || '')
-                        ? 'Cần xem video'
-                        : assignment.recent_submission
-                          ? 'Làm lại'
-                          : 'Bắt đầu'
-                      : 'Chưa mở'}
+                    {assignment.video_id &&
+                    !['completed', 'watched'].includes(
+                      assignment.video_completion_status || '',
+                    )
+                      ? 'Cần xem video'
+                      : assignment.recent_submission
+                        ? 'Làm lại'
+                        : 'Bắt đầu'}
                   </Button>
                 </div>
               </div>
